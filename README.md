@@ -30,12 +30,12 @@ One day your IP changes and then the script is there to fix it. ;-)
 SSH connection to both USG for the following commands:
 
 ```
-admin@USG-Pro-4:~$ sudo touch /config/scripts/post-config.d/reconfigure-site-to-site-vpn.sh
-admin@USG-Pro-4:~$ sudo chmod +x /config/scripts/post-config.d/reconfigure-site-to-site-vpn.sh
-admin@USG-Pro-4:~$ sudo vi /config/scripts/post-config.d/reconfigure-site-to-site-vpn.sh
+admin@USG-Pro-4:~$ sudo touch /config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh
+admin@USG-Pro-4:~$ sudo chmod +x /config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh
+admin@USG-Pro-4:~$ sudo vi /config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh
 ```
 
-Input the content of the `reconfigure-site-to-site-vpn.sh`.
+Input the content of the `vpn-site-to-site-reconfigure.sh`.
 
 Change the variables:
 | Variable          |Description                                                         | Values                       | Line |
@@ -50,16 +50,16 @@ Make sure to convert the file to LF.
 Execute the script:
 
 ```
-admin@USG-Pro-4:~$ /config/scripts/post-config.d/reconfigure-site-to-site-vpn.sh
+admin@USG-Pro-4:~$ /config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh
 ```
 
 Check the logs. Normally you should get an output like the following:
 
 ```
-admin@USG-Pro-4:~$ show log | grep 'reconfigure-site-to-site-vpn'
-Jan 29 21:06:07 USG-Pro-4 reconfigure-site-to-site-vpn: Remote address does not change.
-Jan 29 21:06:07 USG-Pro-4 reconfigure-site-to-site-vpn: Local address does not change.
-Jan 29 21:06:07 USG-Pro-4 reconfigure-site-to-site-vpn: Nothing to commit.
+admin@USG-Pro-4:~$ show log | grep 'vpn-site-to-site-reconfigure'
+Jan 29 21:06:07 USG-Pro-4 vpn-site-to-site-reconfigure: Remote address does not change.
+Jan 29 21:06:07 USG-Pro-4 vpn-site-to-site-reconfigure: Local address does not change.
+Jan 29 21:06:07 USG-Pro-4 vpn-site-to-site-reconfigure: Nothing to commit.
 ```
 
 ### Edit config.gateway.json
