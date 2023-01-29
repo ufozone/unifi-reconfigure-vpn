@@ -14,7 +14,9 @@ Installation
 If it doesn't exist yet, create an Auto IPsec VTI Site-to-Site VPN:
 Go to Settings > Network > "Create new network"-button
 
-| Name    		| _Name of your S2S_ 			|
+| Variable      | Value                     |
+|---------------|---------------------------|
+| Name    		| _Name of your S2S_ 		|
 | Purpose 		| Site-to-Site VPN     		|
 | VPN Type		| Auto IPsec VTI     		|
 | Remote Site	| _Site-B_		     		|
