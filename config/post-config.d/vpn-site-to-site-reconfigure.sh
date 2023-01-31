@@ -1,8 +1,8 @@
 #!/bin/bash
-# File: reconfigure-site-to-site.sh
+# File: vpn-site-to-site-reconfigure.sh
 # Author: ufozone
 # Date: 2023-01-29
-# Version: 0.2
+# Version: 0.3
 # Desc: Site-to-Site VPN in Auto IPsec VTI mode does not detect a change of WAN IP address.
 #       This script checks periodically the current WAN IP addresses of both sites and 
 #       updates the configuration.
@@ -18,7 +18,8 @@ SITE_B_HOST="site-b.ddns.com."
 PRE_SHARED_SECRET="e72abd600a90eb0e733b7c8c856690c95d02819e"
 
 
-# DON'T CHANGE ANYTHING FROM THIS LINE
+# DON'T CHANGE ANYTHING BELOW THIS LINE
+#######################################
 NAME="vpn-site-to-site-reconfigure"
 WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
 if [[ "$THIS_SITE" == "A" ]]
@@ -30,10 +31,10 @@ else
 	REMOTE_HOST=$SITE_A_HOST
 fi
 
-# begin configuration
+# Begin configuration
 $WR begin
 
-# Check site-to-site configuration over path
+# Check current site-to-site VPN configuration over path
 VALIDATE_ESP_GROUP=$($WR show vpn ipsec esp-group ESP0)
 if [[ $(echo "$VALIDATE_ESP_GROUP" | grep -i 'empty') ]]
 then
@@ -49,6 +50,7 @@ then
 	exit 1
 fi
 
+# Get local and remote addresses via DDNS lookup
 GET_LOCAL_ADDRESS=$(host -st A $LOCAL_HOST)
 LOCAL_ADDRESS=$(echo $GET_LOCAL_ADDRESS | grep -Pom 1 '\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b' | head -n1)
 GET_REMOTE_ADDRESS=$(host -st A $REMOTE_HOST)
@@ -65,18 +67,31 @@ then
 	exit 1
 fi
 
+# Check current peer configuration and used pre-shared-secret
 VALIDATE_PEER=$($WR show vpn ipsec site-to-site peer $REMOTE_ADDRESS)
-if [[ $(echo "$VALIDATE_PEER" | grep -i 'empty') ]]
+VALIDATE_PRE_SHARED_SECRET=$($WR show vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication pre-shared-secret)
+CURRENT_PRE_SHARED_SECRET=$(echo $VALIDATE_PRE_SHARED_SECRET | grep -Piom 1 '\b[0-9a-f]+\b' | head -n1)
+
+# No peer config found or incorrect pre-shared-secret in unse
+if [[ ( $(echo "$VALIDATE_PEER" | grep -i 'empty') ) || ( "$CURRENT_PRE_SHARED_SECRET" != "$PRE_SHARED_SECRET" ) ]]
 then
-	logger -t $NAME -- "New remote adress found or no site-to-site configured."
-	VALIDATE_DELETE=$($WR delete vpn ipsec site-to-site)
-	if [[ $(echo "$VALIDATE_DELETE" | grep -i 'nothing') ]]
+	if [[ $(echo "$VALIDATE_PEER" | grep -i 'empty') ]]
 	then
-		logger -t $NAME -- "No site-to-site configuration found."
+		logger -t $NAME -- "No site-to-site peer configuration found."
+	elif [[ "$CURRENT_PRE_SHARED_SECRET" != "$PRE_SHARED_SECRET" ]]
+	then
+		logger -t $NAME -- "Incorrect pre-shared-secret is used."
 	else
-		logger -t $NAME -- "Existing site-to-site configuration deleted."
+		logger -t $NAME -- "New remote adress detected. Updating config."
 	fi
-	logger -t $NAME -- "Set up new site-to-site configuration."
+	
+	VALIDATE_DELETE=$($WR delete vpn ipsec site-to-site)
+	if [[ ! $(echo "$VALIDATE_DELETE" | grep -i 'nothing') ]]
+	then
+		logger -t $NAME -- "Existing site-to-site peer deleted."
+	fi
+	
+	logger -t $NAME -- "Set up new site-to-site peer configuration."
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS description "CUSTOM_BY_SCRIPT"
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication mode pre-shared-secret
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication pre-shared-secret $PRE_SHARED_SECRET
@@ -89,15 +104,14 @@ then
 	CONFIG_CHANGED=TRUE
 else
 	logger -t $NAME -- "Remote address does not change."
-
+	
 	VALIDATE_LOCAL_ADDRESS=$($WR show vpn ipsec site-to-site peer $REMOTE_ADDRESS local-address)
 	CURRENT_LOCAL_ADDRESS=$(echo $VALIDATE_LOCAL_ADDRESS | grep -Pom 1 '\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b' | head -n1)
-
+	
 	if [[ "$CURRENT_LOCAL_ADDRESS" != "$LOCAL_ADDRESS" ]]
 	then
 		logger -t $NAME -- "Local address change detected. Updating config."
 		$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS description "CUSTOM_BY_SCRIPT"
-		$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication pre-shared-secret $PRE_SHARED_SECRET
 		$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS local-address $LOCAL_ADDRESS
 		
 		CONFIG_CHANGED=TRUE
