@@ -19,7 +19,7 @@ PRE_SHARED_SECRET="e72abd600a90eb0e733b7c8c856690c95d02819e"
 
 
 # DON'T CHANGE ANYTHING FROM THIS LINE
-NAME=reconfigure-site-to-site-vpn
+NAME="vpn-site-to-site-reconfigure"
 WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
 if [[ "$THIS_SITE" == "A" ]]
 then
