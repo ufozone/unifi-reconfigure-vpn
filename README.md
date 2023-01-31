@@ -94,7 +94,7 @@ esp-group ESP0 {
 }
 ```
 
-If you get `Specified configuration path is not valid`, try the following:
+If you get `Configuration under specified path is empty`, try the following:
 
 ```
 admin@USG-Pro-4:~$ /opt/vyatta/sbin/vyatta-cfg-cmd-wrapper show vpn ipsec
@@ -134,7 +134,9 @@ nat-traversal enable
 ...
 ```
 
-The output is still empty? Then you do not have a valid IPsec VTI site-to-site VPN configuration. Is your USG provisioned since the VPN configuration?
+The group has a different identifier? Please report it to me with log or screenshot.
+
+The output is still empty? Then you don't have a valid IPsec VTI site-to-site VPN configuration. Is your USG provisioned since the VPN configuration?
 
 ### IKE group IKE0 not found in configuration. Abort.
 Same issue as  _ESP group ESP0 not found in configuration. Abort._  See above.
@@ -154,6 +156,13 @@ If the domain can't be resolved, your USG has a problem with the DNS it uses.
 ### No remote address found. Abort.
 Same issue as  _No local address found. Abort._  See above.
 
+
+Compatibility
+-------
+
+Tested and productive in use:
+* Ubiquiti UniFi Security Gateway, USG with FW 4.4.57.5578372
+* Ubiquiti UniFi Security Gateway, USG-PRO-4 with FW 4.4.57.5578372
 
 License
 -------
