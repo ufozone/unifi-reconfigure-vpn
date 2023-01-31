@@ -5,6 +5,7 @@ UniFi: Reconfigure Auto IPsec VTI VPN with dynamic IP on one or both sites
 
 Development & Pull Request
 -----------
+
 Feel free to enhance the script. Pull requests against the master branch will be reviewed and merged.
 
 Installation
@@ -37,15 +38,24 @@ admin@USG-Pro-4:~$ sudo vi /config/scripts/post-config.d/vpn-site-to-site-reconf
 
 Input the content of the `vpn-site-to-site-reconfigure.sh`.
 
-Change the variables:
-| Variable          |Description                                                         | Values                       | Line |
-|-------------------|--------------------------------------------------------------------|------------------------------|------|
-| THIS_SITE         | Letter of current site. Each site must be different from the other | A or B                       |   11 |
-| SITE_A_HOST       | Hostname of site A                                                 | FQDN with final point        |   14 |
-| SITE_B_HOST       | Hostname of site B                                                 | FQDN with final point        |   15 |
-| PRE_SHARED_SECRET | Pre shared key                                                     | Secret with 24 or more bytes |   18 |
+Create configuration file with following commands:
 
-Make sure to convert the file to LF.
+```
+admin@USG-Pro-4:~$ sudo touch /config/vpn-site-to-site.conf
+admin@USG-Pro-4:~$ sudo vi /config/vpn-site-to-site.conf
+```
+
+Input the content of the `vpn-site-to-site.conf`.
+
+Change the variables:
+| Variable          |Description                                                         | Values                       |
+|-------------------|--------------------------------------------------------------------|------------------------------|
+| THIS_SITE         | Letter of current site. Each site must be different from the other | A or B                       |
+| SITE_A_HOST       | Hostname of site A                                                 | FQDN with final point        |
+| SITE_B_HOST       | Hostname of site B                                                 | FQDN with final point        |
+| PRE_SHARED_SECRET | Pre shared key                                                     | Secret with 24 or more bytes |
+
+Make sure to convert both files to LF.
 
 Execute the script:
 
@@ -139,7 +149,7 @@ The group has a different identifier? Please report it to me with log or screens
 The output is still empty? Then you don't have a valid IPsec VTI site-to-site VPN configuration. Is your USG provisioned since the VPN configuration?
 
 ### IKE group IKE0 not found in configuration. Abort.
-Same issue as  _ESP group ESP0 not found in configuration. Abort._  See above.
+Same issue as [ESP group ESP0 not found in configuration. Abort.](#esp-group-esp0-not-found-in-configuration-abort) See above.
 
 ### No local address found. Abort.
 The hostnames for site A and site B must be valid and up-to-date dyndns hosts. The specified domains must have an A record.
@@ -154,7 +164,7 @@ one.one.one.one has address 1.1.1.1
 If the domain can't be resolved, your USG has a problem with the DNS it uses.
 
 ### No remote address found. Abort.
-Same issue as  _No local address found. Abort._  See above.
+Same issue as [No local address found. Abort.](#no-local-address-found-abort) See above.
 
 
 Compatibility

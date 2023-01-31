@@ -2,26 +2,31 @@
 # File: vpn-site-to-site-reconfigure.sh
 # Author: ufozone
 # Date: 2023-01-29
-# Version: 0.3
+# Version: 1.0
 # Desc: Site-to-Site VPN in Auto IPsec VTI mode does not detect a change of WAN IP address.
 #       This script checks periodically the current WAN IP addresses of both sites and 
 #       updates the configuration.
-
-# Which site is this? A or B?
-THIS_SITE="A"
-
-# Hostnames of both sites as FQDN with final point
-SITE_A_HOST="site-a.ddns.com."
-SITE_B_HOST="site-b.ddns.com."
-
-# Pre shared secret must be the same on both sites
-PRE_SHARED_SECRET="e72abd600a90eb0e733b7c8c856690c95d02819e"
-
-
+# 
 # DON'T CHANGE ANYTHING BELOW THIS LINE
 #######################################
+
+CONFIG="/config/vpn-site-to-site.conf"
 NAME="vpn-site-to-site-reconfigure"
 WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
+
+if [[ ! -e $CONFIG ]]
+then
+	logger -t $NAME -- "File vpn-site-to-site.conf not found. Abort."
+	exit 1
+fi
+source $CONFIG
+
+if [[ ( ( "$THIS_SITE" != "A" ) && ( "$THIS_SITE" != "B" ) ) || ( "$SITE_A_HOST" == "" ) || ( "$SITE_B_HOST" == "" ) || ( "$PRE_SHARED_SECRET" == "" ) ]]
+then
+	logger -t $NAME -- "Configuration in vpn-site-to-site.conf is invalid. Abort."
+	exit 1
+fi
+
 if [[ "$THIS_SITE" == "A" ]]
 then
 	LOCAL_HOST=$SITE_A_HOST
