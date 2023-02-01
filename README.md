@@ -26,7 +26,7 @@ Wait for provisioning. After all, your site-to-site VPN connection between your 
 
 One day your IP changes and then the script is there to fix it. ;-)
 
-### Set-up script on USGs
+### Set-up script and configuration on USGs
 
 SSH connection to both USG for the following commands:
 
@@ -48,9 +48,9 @@ admin@USG-Pro-4:~$ sudo vi /config/vpn-site-to-site.conf
 Input the content of the `vpn-site-to-site.conf`.
 
 Change the variables:
-| Variable          |Description                                                         | Values                       |
+| Variable          | Description                                                        | Values                       |
 |-------------------|--------------------------------------------------------------------|------------------------------|
-| THIS_SITE         | Letter of current site. Each site must be different from the other | A or B                       |
+| THIS_SITE         | Letter of current site. Each site must be different from the other | ENUM(A,B)                    |
 | SITE_A_HOST       | Hostname of site A                                                 | FQDN with final point        |
 | SITE_B_HOST       | Hostname of site B                                                 | FQDN with final point        |
 | PRE_SHARED_SECRET | Pre shared key                                                     | Secret with 24 or more bytes |
@@ -84,6 +84,18 @@ Troubleshooting
 -----------
 
 The script catches some error conditions. Below the errors and their solution explained:
+
+### File vpn-site-to-site.conf not found. Abort.
+You didn't create the file `vpn-site-to-site.conf` at all or you created it in the wrong folder.
+
+Accomplish the following instructions carefully:
+[Set-up script and configuration on USGs](#set-up-script-and-configuration-on-usgs)
+
+### Configuration in vpn-site-to-site.conf is invalid. Abort.
+The site-to-site VPN variables are not set or set incorrectly in the configuration. Check the variables for completeness and validity.
+
+Accomplish the following instructions carefully:
+[Set-up script and configuration on USGs](#set-up-script-and-configuration-on-usgs)
 
 ### ESP group ESP0 not found in configuration. Abort.
 You need to set up an Auto IPsec VTI site-to-site VPN connection in the controller. Did you make? Not good.
