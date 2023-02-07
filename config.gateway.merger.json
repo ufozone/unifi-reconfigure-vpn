@@ -1,0 +1,62 @@
+{
+        "vpn": {
+                "ipsec": {
+                        "auto-firewall-nat-exclude": "enable",
+                        "esp-group": {
+                                "ESP0": {
+                                        "compression": "disable",
+                                        "lifetime": "3600",
+                                        "mode": "tunnel",
+                                        "pfs": "disable",
+                                        "proposal": {
+                                                "1": {
+                                                        "encryption": "aes128",
+                                                        "hash": "sha1"
+                                                }
+                                        }
+                                }
+                        },
+                        "ike-group": {
+                                "IKE0": {
+                                        "dead-peer-detection": {
+                                                "action": "restart",
+                                                "interval": "20",
+                                                "timeout": "120"
+                                        },
+                                        "key-exchange": "ikev1",
+                                        "lifetime": "28800",
+                                        "proposal": {
+                                                "1": {
+                                                        "dh-group": 14,
+                                                        "encryption": "aes128",
+                                                        "hash": "sha1"
+                                                }
+                                        }
+                                }
+                        },
+                        "ipsec-interfaces": {
+                                "interface": [
+                                        "pppoe0"
+                                ]
+                        },
+                        "nat-networks": {
+                                "allowed-network": {
+                                        "0.0.0.0/0": "''"
+                                }
+                        },
+                        "nat-traversal": "enable"
+                }
+        },
+        "system": {
+                "task-scheduler": {
+                        "task": {
+                                "postprovision": {
+                                        "executable": {
+                                                "path": "/config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh"
+                                        },
+                                        "interval": "5m"
+                                }
+                        }
+                }
+        }
+}

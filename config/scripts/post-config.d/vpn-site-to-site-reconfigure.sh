@@ -11,6 +11,7 @@
 #######################################
 
 CONFIG="/config/vpn-site-to-site.conf"
+PEER="/config/vpn-site-to-site.peer"
 NAME="vpn-site-to-site-reconfigure"
 WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
 
@@ -30,10 +31,14 @@ fi
 if [[ "$THIS_SITE" == "A" ]]
 then
 	LOCAL_HOST=$SITE_A_HOST
+	LOCAL_NETWORKS=$SITE_A_NETWORKS
 	REMOTE_HOST=$SITE_B_HOST
+	REMOTE_NETWORKS=$SITE_B_NETWORKS
 else
 	LOCAL_HOST=$SITE_B_HOST
+	LOCAL_NETWORKS=$SITE_B_NETWORKS
 	REMOTE_HOST=$SITE_A_HOST
+	REMOTE_NETWORKS=$SITE_A_NETWORKS
 fi
 
 # Begin configuration
@@ -77,7 +82,7 @@ VALIDATE_PEER=$($WR show vpn ipsec site-to-site peer $REMOTE_ADDRESS)
 VALIDATE_PRE_SHARED_SECRET=$($WR show vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication pre-shared-secret)
 CURRENT_PRE_SHARED_SECRET=$(echo $VALIDATE_PRE_SHARED_SECRET | grep -Piom 1 '\b[0-9a-f]+\b' | head -n1)
 
-# No peer config found or incorrect pre-shared-secret in unse
+# No peer config found or incorrect pre-shared-secret in use
 if [[ ( $(echo "$VALIDATE_PEER" | grep -i 'empty') ) || ( "$CURRENT_PRE_SHARED_SECRET" != "$PRE_SHARED_SECRET" ) ]]
 then
 	if [[ $(echo "$VALIDATE_PEER" | grep -i 'empty') ]]
@@ -90,21 +95,41 @@ then
 		logger -t $NAME -- "New remote adress detected. Updating config."
 	fi
 	
-	VALIDATE_DELETE=$($WR delete vpn ipsec site-to-site)
-	if [[ ! $(echo "$VALIDATE_DELETE" | grep -i 'nothing') ]]
+	if [[ -e $PEER ]]
 	then
-		logger -t $NAME -- "Existing site-to-site peer deleted."
+		LAST_PEER=$(< $PEER)
+		VALIDATE_DELETE=$($WR delete vpn ipsec site-to-site peer $LAST_PEER)
+		if [[ ! $(echo "$VALIDATE_DELETE" | grep -i 'nothing') ]]
+		then
+			logger -t $NAME -- "Existing site-to-site peer deleted."
+		fi
 	fi
-	
+
 	logger -t $NAME -- "Set up new site-to-site peer configuration."
+	(echo $REMOTE_ADDRESS > $PEER) &> /dev/null
+	
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS description "CUSTOM_BY_SCRIPT"
+	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication id $LOCAL_HOST
+	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication remote-id $REMOTE_HOST
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication mode pre-shared-secret
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication pre-shared-secret $PRE_SHARED_SECRET
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS connection-type initiate
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS ike-group IKE0
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS local-address $LOCAL_ADDRESS
-	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS vti bind vti0
-	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS vti esp-group ESP0
+	
+	INDEX=0
+	for LOCAL_NETWORK in `echo $LOCAL_NETWORKS`
+	do
+		for REMOTE_NETWORK in `echo $REMOTE_NETWORKS`
+		do
+			((INDEX++))
+			$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS tunnel $INDEX esp-group ESP0
+			$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS tunnel $INDEX local prefix $LOCAL_NETWORK
+			$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS tunnel $INDEX remote prefix $REMOTE_NETWORK
+			$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS tunnel $INDEX allow-nat-networks disable
+			$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS tunnel $INDEX allow-public-networks disable
+		done
+	done
 	
 	CONFIG_CHANGED=TRUE
 else
@@ -116,7 +141,6 @@ else
 	if [[ "$CURRENT_LOCAL_ADDRESS" != "$LOCAL_ADDRESS" ]]
 	then
 		logger -t $NAME -- "Local address change detected. Updating config."
-		$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS description "CUSTOM_BY_SCRIPT"
 		$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS local-address $LOCAL_ADDRESS
 		
 		CONFIG_CHANGED=TRUE
