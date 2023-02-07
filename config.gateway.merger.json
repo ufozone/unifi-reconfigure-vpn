@@ -1,4 +1,16 @@
 {
+        "system": {
+                "task-scheduler": {
+                        "task": {
+                                "postprovision": {
+                                        "executable": {
+                                                "path": "/config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh"
+                                        },
+                                        "interval": "5m"
+                                }
+                        }
+                }
+        },
         "vpn": {
                 "ipsec": {
                         "auto-firewall-nat-exclude": "enable",
@@ -45,18 +57,6 @@
                                 }
                         },
                         "nat-traversal": "enable"
-                }
-        },
-        "system": {
-                "task-scheduler": {
-                        "task": {
-                                "postprovision": {
-                                        "executable": {
-                                                "path": "/config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh"
-                                        },
-                                        "interval": "5m"
-                                }
-                        }
                 }
         }
 }
