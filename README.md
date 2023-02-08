@@ -1,7 +1,7 @@
-UniFi: Reconfigure Auto IPsec VTI VPN with dynamic IP on one or both sites
+UniFi: Configure IPsec VTI VPN with dynamic IP on one or both sites
 =========
 
-**ATTENTION: The script only works for a bidirectional site-to-site VPN. Furthermore, no other (automatic or manual) IPsec site-to-site VPN can be configured.**
+**ATTENTION: The script only works for a bidirectional site-to-site VPN.**
 
 Development & Pull Request
 -----------
@@ -12,19 +12,7 @@ Installation
 -----------
 
 ### Settings in Controller
-If it doesn't exist yet, create an Auto IPsec VTI Site-to-Site VPN:
-Go to Settings > Network > "Create new network"-button
-
-| Variable      | Value                     |
-|---------------|---------------------------|
-| Name    		| _Name of your S2S_ 		|
-| Purpose 		| Site-to-Site VPN     		|
-| VPN Type		| Auto IPsec VTI     		|
-| Remote Site	| _Site-B_		     		|
-
-Wait for provisioning. After all, your site-to-site VPN connection between your local and the remote site is established.
-
-One day your IP changes and then the script is there to fix it. ;-)
+Nothing to do in controller.
 
 ### Set-up script and configuration on USGs
 
@@ -53,6 +41,8 @@ Change the variables:
 | THIS_SITE         | Letter of current site. Each site must be different from the other | ENUM(A,B)                    |
 | SITE_A_HOST       | Hostname of site A                                                 | FQDN with final point        |
 | SITE_B_HOST       | Hostname of site B                                                 | FQDN with final point        |
+| SITE_A_NETWORKS   | Networks of site A which are to be routed                          | CIDR format space seperated  |
+| SITE_B_NETWORKS   | Networks of site B which are to be routed                          | CIDR format space seperated  |
 | PRE_SHARED_SECRET | Pre shared key                                                     | Secret with 24 or more bytes |
 
 Make sure to convert both files to LF.
@@ -75,10 +65,16 @@ Jan 29 21:06:07 USG-Pro-4 vpn-site-to-site-reconfigure: Nothing to commit.
 ### Edit config.gateway.json
 
 Your `config.gateway.json` needs an addition:
-Merge the contents of the `config.gateway.sheduler.json` in your `config.gateway.json` for both sites.
+Merge the contents of the `config.gateway.merge.json` in your `config.gateway.json` for both sites.
 
 __You have no idea how to find or create the config.gateway.json?__
 Check this: [UniFi - USG Advanced Configuration Using config.gateway.json](https://help.ui.com/hc/en-us/articles/215458888-UniFi-USG-Advanced-Configuration-Using-config-gateway-json)
+
+Known Issues
+-----------
+
+### Gateway (USG) of the other side is not reachable
+But "ping" and "traceroute" works. I don't know why (yet).
 
 Troubleshooting
 -----------
@@ -96,72 +92,6 @@ The site-to-site VPN variables are not set or set incorrectly in the configurati
 
 Accomplish the following instructions carefully:
 [Set-up script and configuration on USGs](#set-up-script-and-configuration-on-usgs)
-
-### ESP group ESP0 not found in configuration. Abort.
-You need to set up an Auto IPsec VTI site-to-site VPN connection in the controller. Did you make? Not good.
-
-Let's debug it. Execute the following command. The output should look something like this:
-
-```
-admin@USG-Pro-4:~$ /opt/vyatta/sbin/vyatta-cfg-cmd-wrapper show vpn ipsec esp-group
-esp-group ESP0 {
-    compression disable
-    lifetime 3600
-    mode tunnel
-    pfs enable
-    proposal 1 {
-        encryption aes256
-        hash sha1
-    }
-}
-```
-
-If you get `Configuration under specified path is empty`, try the following:
-
-```
-admin@USG-Pro-4:~$ /opt/vyatta/sbin/vyatta-cfg-cmd-wrapper show vpn ipsec
-auto-firewall-nat-exclude enable
-esp-group ESP0 {
-    compression disable
-    lifetime 3600
-    mode tunnel
-    pfs enable
-    proposal 1 {
-        encryption aes256
-        hash sha1
-    }
-}
-ike-group IKE0 {
-    dead-peer-detection {
-        action restart
-        interval 20
-        timeout 120
-    }
-    key-exchange ikev1
-    lifetime 28800
-    proposal 1 {
-        dh-group 14
-        encryption aes256
-        hash sha1
-    }
-}
-ipsec-interfaces {
-    interface pppoe0
-}
-nat-networks {
-    allowed-network 0.0.0.0/0 {
-    }
-}
-nat-traversal enable
-...
-```
-
-The group has a different identifier? Please report it to me with log or screenshot.
-
-The output is still empty? Then you don't have a valid IPsec VTI site-to-site VPN configuration. Is your USG provisioned since the VPN configuration?
-
-### IKE group IKE0 not found in configuration. Abort.
-Same issue as [ESP group ESP0 not found in configuration. Abort.](#esp-group-esp0-not-found-in-configuration-abort) See above.
 
 ### No local address found. Abort.
 The hostnames for site A and site B must be valid and up-to-date dyndns hosts. The specified domains must have an A record.

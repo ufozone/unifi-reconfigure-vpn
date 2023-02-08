@@ -2,25 +2,25 @@
 # File: vpn-site-to-site-reconfigure.sh
 # Author: ufozone
 # Date: 2023-01-29
-# Version: 1.0
-# Desc: Site-to-Site VPN in Auto IPsec VTI mode does not detect a change of WAN IP address.
+# Version: 2.0 RC
+# Desc: UniFi Site-to-Site IPsec VTI VPN does not detect a change of WAN IP address.
 #       This script checks periodically the current WAN IP addresses of both sites and 
 #       updates the configuration.
 # 
 # DON'T CHANGE ANYTHING BELOW THIS LINE
 #######################################
 
-CONFIG="/config/vpn-site-to-site.conf"
-PEER="/config/vpn-site-to-site.peer"
+CONFIG_FILE="/config/vpn-site-to-site.conf"
+PEER_FILE="/config/vpn-site-to-site.peer"
 NAME="vpn-site-to-site-reconfigure"
 WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
 
-if [[ ! -e $CONFIG ]]
+if [[ ! -e $CONFIG_FILE ]]
 then
 	logger -t $NAME -- "File vpn-site-to-site.conf not found. Abort."
 	exit 1
 fi
-source $CONFIG
+source $CONFIG_FILE
 
 if [[ ( ( "$THIS_SITE" != "A" ) && ( "$THIS_SITE" != "B" ) ) || ( "$SITE_A_HOST" == "" ) || ( "$SITE_B_HOST" == "" ) || ( "$PRE_SHARED_SECRET" == "" ) ]]
 then
@@ -30,34 +30,15 @@ fi
 
 if [[ "$THIS_SITE" == "A" ]]
 then
+	TRANSFER_ADDRESS="10.255.254.1/32"
 	LOCAL_HOST=$SITE_A_HOST
-	LOCAL_NETWORKS=$SITE_A_NETWORKS
 	REMOTE_HOST=$SITE_B_HOST
 	REMOTE_NETWORKS=$SITE_B_NETWORKS
 else
+	TRANSFER_ADDRESS="10.255.254.2/32"
 	LOCAL_HOST=$SITE_B_HOST
-	LOCAL_NETWORKS=$SITE_B_NETWORKS
 	REMOTE_HOST=$SITE_A_HOST
 	REMOTE_NETWORKS=$SITE_A_NETWORKS
-fi
-
-# Begin configuration
-$WR begin
-
-# Check current site-to-site VPN configuration over path
-VALIDATE_ESP_GROUP=$($WR show vpn ipsec esp-group ESP0)
-if [[ $(echo "$VALIDATE_ESP_GROUP" | grep -i 'empty') ]]
-then
-	logger -t $NAME -- "ESP group ESP0 not found in configuration. Abort."
-	logger -t $NAME -- "You need to set up an Auto IPsec VTI site-to-site VPN connection in the controller."
-	exit 1
-fi
-VALIDATE_IKE_GROUP=$($WR show vpn ipsec ike-group IKE0)
-if [[ $(echo "$VALIDATE_IKE_GROUP" | grep -i 'empty') ]]
-then
-	logger -t $NAME -- "IKE group IKE0 not found in configuration. Abort."
-	logger -t $NAME -- "You need to set up an Auto IPsec VTI site-to-site VPN connection in the controller."
-	exit 1
 fi
 
 # Get local and remote addresses via DDNS lookup
@@ -75,6 +56,57 @@ if [[ "$REMOTE_ADDRESS" == "" ]]
 then
 	logger -t $NAME -- "No remote address found. Abort."
 	exit 1
+fi
+
+# Begin configuration
+$WR begin
+
+# Check current site-to-site VPN configuration over path
+VALIDATE_INTERFACE=$($WR show interfaces vti vti64 address)
+if [[ $(echo "$VALIDATE_INTERFACE" | grep -i 'empty') ]]
+then
+	logger -t $NAME -- "VTI interface not found in configuration. Create."
+	
+	$WR set interfaces vti vti64 address $TRANSFER_ADDRESS
+fi
+
+for REMOTE_NETWORK in `echo $REMOTE_NETWORKS`
+do
+	VALIDATE_ROUTE=$($WR show protocols static interface-route $REMOTE_NETWORK next-hop-interface vti64)
+	if [[ $(echo "$VALIDATE_ROUTE" | grep -i 'empty') ]]
+	then
+		logger -t $NAME -- "Static route $REMOTE_NETWORK not found. Create."
+		
+		$WR set protocols static interface-route $REMOTE_NETWORK next-hop-interface vti64 distance 30
+	fi
+done
+
+# Check current site-to-site VPN configuration over path
+VALIDATE_ESP_GROUP=$($WR show vpn ipsec esp-group ESP0)
+if [[ $(echo "$VALIDATE_ESP_GROUP" | grep -i 'empty') ]]
+then
+	logger -t $NAME -- "ESP group ESP0 not found in configuration. Create."
+	
+	$WR set vpn ipsec esp-group ESP0 compression disable
+	$WR set vpn ipsec esp-group ESP0 lifetime 3600
+	$WR set vpn ipsec esp-group ESP0 mode tunnel
+	$WR set vpn ipsec esp-group ESP0 pfs enable
+	$WR set vpn ipsec esp-group ESP0 proposal 1 encryption aes128
+	$WR set vpn ipsec esp-group ESP0 proposal 1 hash sha1
+fi
+VALIDATE_IKE_GROUP=$($WR show vpn ipsec ike-group IKE0)
+if [[ $(echo "$VALIDATE_IKE_GROUP" | grep -i 'empty') ]]
+then
+	logger -t $NAME -- "IKE group IKE0 not found in configuration. Create."
+	
+	$WR set vpn ipsec ike-group IKE0 dead-peer-detection action restart
+	$WR set vpn ipsec ike-group IKE0 dead-peer-detection interval 20
+	$WR set vpn ipsec ike-group IKE0 dead-peer-detection timeout 120
+	$WR set vpn ipsec ike-group IKE0 key-exchange ikev1
+	$WR set vpn ipsec ike-group IKE0 lifetime 28800
+	$WR set vpn ipsec ike-group IKE0 proposal 1 dh-group 14
+	$WR set vpn ipsec ike-group IKE0 proposal 1 encryption aes128
+	$WR set vpn ipsec ike-group IKE0 proposal 1 hash sha1
 fi
 
 # Check current peer configuration and used pre-shared-secret
@@ -95,18 +127,18 @@ then
 		logger -t $NAME -- "New remote adress detected. Updating config."
 	fi
 	
-	if [[ -e $PEER ]]
+	if [[ -e $PEER_FILE ]]
 	then
-		LAST_PEER=$(< $PEER)
+		LAST_PEER=$(< $PEER_FILE)
 		VALIDATE_DELETE=$($WR delete vpn ipsec site-to-site peer $LAST_PEER)
 		if [[ ! $(echo "$VALIDATE_DELETE" | grep -i 'nothing') ]]
 		then
 			logger -t $NAME -- "Existing site-to-site peer deleted."
 		fi
 	fi
-
+	
 	logger -t $NAME -- "Set up new site-to-site peer configuration."
-	(echo $REMOTE_ADDRESS > $PEER) &> /dev/null
+	(echo $REMOTE_ADDRESS > $PEER_FILE) &> /dev/null
 	
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS description "CUSTOM_BY_SCRIPT"
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication id $LOCAL_HOST
@@ -116,20 +148,8 @@ then
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS connection-type initiate
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS ike-group IKE0
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS local-address $LOCAL_ADDRESS
-	
-	INDEX=0
-	for LOCAL_NETWORK in `echo $LOCAL_NETWORKS`
-	do
-		for REMOTE_NETWORK in `echo $REMOTE_NETWORKS`
-		do
-			((INDEX++))
-			$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS tunnel $INDEX esp-group ESP0
-			$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS tunnel $INDEX local prefix $LOCAL_NETWORK
-			$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS tunnel $INDEX remote prefix $REMOTE_NETWORK
-			$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS tunnel $INDEX allow-nat-networks disable
-			$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS tunnel $INDEX allow-public-networks disable
-		done
-	done
+	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS vti bind vti64
+	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS vti esp-group ESP0
 	
 	CONFIG_CHANGED=TRUE
 else
