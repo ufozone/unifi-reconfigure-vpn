@@ -73,8 +73,21 @@ Check this: [UniFi - USG Advanced Configuration Using config.gateway.json](https
 Known Issues
 -----------
 
-### Gateway (USG) of the other side is not reachable
-But "ping" and "traceroute" works. I don't know why (yet).
+### Gateway (USG) of the other side is not reachable, but "ping" and "traceroute" works
+Long story short: You have to set a custom MSS clamping value in UniFi controller for both sites.
+
+Legacy UI:
+"Devices" > Click on USG > "Config" > "Advanced"
+
+New UI:
+"UniFi Devices" > Click on USG > "Settings" > "Services"
+
+In my case, I have set the value to 1328, because pppoe interface has MTU 1492 and vti interface get MTU 1436.
+
+For more information, see this community thread: [Site-to-site VPN and MSS clamping](https://community.ui.com/questions/Site-to-site-VPN-and-MSS-clamping/9ec02bdb-f327-4e6e-9199-bbdc5f639904)
+
+### Gateway (USG) can not reach remote networks
+I don't know why (yet).
 
 Troubleshooting
 -----------
