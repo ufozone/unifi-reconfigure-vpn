@@ -1,1 +1,4 @@
-/.project
+.coverage
+.vscode
+.project
+coverage.xml
