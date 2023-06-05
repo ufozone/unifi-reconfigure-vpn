@@ -2,7 +2,7 @@
 # File: vpn-site-to-site-reconfigure.sh
 # Author: ufozone
 # Date: 2023-01-29
-# Version: 2.0
+# Version: 2.0.1
 # Desc: UniFi Site-to-Site IPsec VTI VPN does not detect a change of WAN IP address.
 #       This script checks periodically the current WAN IP addresses of both sites and 
 #       updates the configuration.
@@ -79,7 +79,7 @@ do
 		
 		$WR set protocols static interface-route $REMOTE_NETWORK next-hop-interface vti64 distance 30
 	fi
-	VALIDATE_FIREWALL=$($WR firewall group network-group remote_site_vpn_network network $REMOTE_NETWORK)
+	VALIDATE_FIREWALL=$($WR show firewall group network-group remote_site_vpn_network network $REMOTE_NETWORK)
 	if [[ $(echo "$VALIDATE_FIREWALL" | grep -i 'empty') ]]
 	then
 		logger -t $NAME -- "Firewall group item $REMOTE_NETWORK not found. Create."
