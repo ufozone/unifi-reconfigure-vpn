@@ -10,6 +10,7 @@
 # DON'T CHANGE ANYTHING BELOW THIS LINE
 #######################################
 
+CONFIG_CHANGED=FALSE
 CONFIG_FILE="/config/vpn-site-to-site.conf"
 PEER_FILE="/config/vpn-site-to-site.peer"
 NAME="vpn-site-to-site-reconfigure"
@@ -68,6 +69,8 @@ then
 	logger -t $NAME -- "VTI interface not found in configuration. Create."
 	
 	$WR set interfaces vti vti64 address $TRANSFER_ADDRESS
+	
+	CONFIG_CHANGED=TRUE
 fi
 
 for REMOTE_NETWORK in `echo $REMOTE_NETWORKS`
@@ -78,6 +81,8 @@ do
 		logger -t $NAME -- "Static route $REMOTE_NETWORK not found. Create."
 		
 		$WR set protocols static interface-route $REMOTE_NETWORK next-hop-interface vti64 distance 30
+		
+		CONFIG_CHANGED=TRUE
 	fi
 	VALIDATE_FIREWALL=$($WR show firewall group network-group remote_site_vpn_network network $REMOTE_NETWORK)
 	if [[ $(echo "$VALIDATE_FIREWALL" | grep -i 'empty') ]]
@@ -85,6 +90,8 @@ do
 		logger -t $NAME -- "Firewall group item $REMOTE_NETWORK not found. Create."
 		
 		$WR set firewall group network-group remote_site_vpn_network network $REMOTE_NETWORK
+		
+		CONFIG_CHANGED=TRUE
 	fi
 done
 
@@ -98,8 +105,10 @@ then
 	$WR set vpn ipsec esp-group ESP0 lifetime 3600
 	$WR set vpn ipsec esp-group ESP0 mode tunnel
 	$WR set vpn ipsec esp-group ESP0 pfs enable
-	$WR set vpn ipsec esp-group ESP0 proposal 1 encryption aes128
+	$WR set vpn ipsec esp-group ESP0 proposal 1 encryption aes256
 	$WR set vpn ipsec esp-group ESP0 proposal 1 hash sha1
+	
+	CONFIG_CHANGED=TRUE
 fi
 VALIDATE_IKE_GROUP=$($WR show vpn ipsec ike-group IKE0)
 if [[ $(echo "$VALIDATE_IKE_GROUP" | grep -i 'empty') ]]
@@ -109,11 +118,14 @@ then
 	$WR set vpn ipsec ike-group IKE0 dead-peer-detection action restart
 	$WR set vpn ipsec ike-group IKE0 dead-peer-detection interval 20
 	$WR set vpn ipsec ike-group IKE0 dead-peer-detection timeout 120
+	$WR set vpn ipsec ike-group IKE0 ikev2-reauth no
 	$WR set vpn ipsec ike-group IKE0 key-exchange ikev1
 	$WR set vpn ipsec ike-group IKE0 lifetime 28800
 	$WR set vpn ipsec ike-group IKE0 proposal 1 dh-group 14
-	$WR set vpn ipsec ike-group IKE0 proposal 1 encryption aes128
+	$WR set vpn ipsec ike-group IKE0 proposal 1 encryption aes256
 	$WR set vpn ipsec ike-group IKE0 proposal 1 hash sha1
+	
+	CONFIG_CHANGED=TRUE
 fi
 
 # Check current peer configuration and used pre-shared-secret
@@ -154,6 +166,7 @@ then
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication pre-shared-secret $PRE_SHARED_SECRET
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS connection-type initiate
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS ike-group IKE0
+	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS ikev2-reauth inherit
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS local-address $LOCAL_ADDRESS
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS vti bind vti64
 	$WR set vpn ipsec site-to-site peer $REMOTE_ADDRESS vti esp-group ESP0
@@ -172,7 +185,6 @@ else
 		
 		CONFIG_CHANGED=TRUE
 	else
-		CONFIG_CHANGED=FALSE
 		logger -t $NAME -- "Local address does not change."
 	fi
 fi
