@@ -92,7 +92,13 @@ I don't know why (yet).
 Troubleshooting
 -----------
 
-The script catches some error conditions. Below the errors and their solution explained:
+The script catches some error conditions. In verbose mode the whole "magic" can be displayed. Activate the verbose mode with the `-v` option:
+
+```
+admin@USG-Pro-4:~$ /config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh -v
+```
+
+Below the errors and their solution explained:
 
 ### File vpn-site-to-site.conf not found. Abort.
 You didn't create the file `vpn-site-to-site.conf` at all or you created it in the wrong folder.
