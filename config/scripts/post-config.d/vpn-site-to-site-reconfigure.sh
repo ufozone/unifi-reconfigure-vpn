@@ -10,6 +10,37 @@
 # DON'T CHANGE ANYTHING BELOW THIS LINE
 #######################################
 
+Log()
+{
+    if [[ $VERBOSE == TRUE ]]
+    then
+        echo -e "\e[1;32m$@\e[0m"
+    fi
+    if [[ $DEBUG == FALSE ]]
+    then
+        logger -t $NAME -- "$@"
+    fi
+}
+
+Verbose()
+{
+    if [[ $VERBOSE == TRUE ]]
+    then
+        echo "$@"
+    fi
+}
+
+Reset()
+{
+    echo "Reset all configuration changes."
+    $WR begin
+    $WR load
+    echo "Commit..."
+    $WR commit
+    $WR end
+    echo "Finished."
+}
+
 Help()
 {
     echo "UniFi Site-to-Site IPsec VTI VPN does not detect a change of WAN IP address."
@@ -19,40 +50,9 @@ Help()
     echo "Options:"
     echo "d     Debug mode. Does not make any changes to the configuration, but displays them."
     echo "h     Print this Help."
+    echo "r     Reset all configuration changes."
     echo "v     Verbose mode. It provides additional details."
     echo
-}
-
-Log()
-{
-    if [[ $VERBOSE == TRUE ]]
-    then
-        echo -e "\e[1;32m${1}\e[0m"
-    fi
-    logger -t $NAME -- $1
-}
-
-Verbose()
-{
-    if [[ $VERBOSE == TRUE ]]
-    then
-        echo "${1}"
-    fi
-}
-
-Command()
-{
-    if [[ $VERBOSE == TRUE ]]
-    then
-        echo -e "\e[1;41mVyatta Command:\e[0m $1"
-    elif [[ $DEBUG == TRUE ]]
-    then
-        echo "${1}"
-    fi
-    if [[ $DEBUG == FALSE ]]
-    then
-        ${WR} $1
-    fi
 }
 
 VERBOSE=FALSE
@@ -63,15 +63,28 @@ PEER_FILE="/config/vpn-site-to-site.peer"
 NAME="vpn-site-to-site-reconfigure"
 WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
 
-while getopts ":vdh" option
+# Set alias for command
+shopt -s expand_aliases
+alias Command=$WR
+
+while getopts ":dhrv" option
 do
    case ${option} in
-      v) VERBOSE=TRUE;;
       d) DEBUG=TRUE;;
       h) Help
          exit;;
+      r) Reset
+         exit;;
+      v) VERBOSE=TRUE;;
    esac
 done
+
+# Make sure script is run as group vyattacfg
+if [[ $(id -ng) != "vyattacfg" ]]
+then
+    Verbose "Script run in wrong scope. Restart."
+    exec sg vyattacfg -c "$0 $@"
+fi
 
 if [[ ! -e $CONFIG_FILE ]]
 then
@@ -121,14 +134,14 @@ else
 fi
 
 # Begin configuration
-Command "begin"
+Command begin
 
 # Check current site-to-site VPN configuration over path
 VALIDATE_INTERFACE=$(${WR} show interfaces vti vti64 address)
 if [[ $(echo "${VALIDATE_INTERFACE}" | grep -i 'empty') ]]
 then
     Log "VTI interface not found in configuration. Create."
-    Command "set interfaces vti vti64 address ${TRANSFER_ADDRESS}"
+    Command set interfaces vti vti64 address ${TRANSFER_ADDRESS}
     
     CONFIG_CHANGED=TRUE
 else
@@ -141,7 +154,7 @@ do
     if [[ $(echo "${VALIDATE_ROUTE}" | grep -i 'empty') ]]
     then
         Log "Static route ${REMOTE_NETWORK} not found. Create."
-        Command "set protocols static interface-route ${REMOTE_NETWORK} next-hop-interface vti64 distance 30"
+        Command set protocols static interface-route ${REMOTE_NETWORK} next-hop-interface vti64 distance 30
         
         CONFIG_CHANGED=TRUE
     else
@@ -151,7 +164,7 @@ do
     if [[ $(echo "${VALIDATE_FIREWALL}" | grep -i 'empty') ]]
     then
         Log "Firewall group item ${REMOTE_NETWORK} not found. Create."
-        Command "set firewall group network-group remote_site_vpn_network network ${REMOTE_NETWORK}"
+        Command set firewall group network-group remote_site_vpn_network network ${REMOTE_NETWORK}
         
         CONFIG_CHANGED=TRUE
     else
@@ -165,12 +178,12 @@ if [[ $(echo "${VALIDATE_ESP_GROUP}" | grep -i 'empty') ]]
 then
     Log "ESP group ESP0 not found in configuration. Create."
     
-    Command "set vpn ipsec esp-group ESP0 compression disable"
-    Command "set vpn ipsec esp-group ESP0 lifetime 3600"
-    Command "set vpn ipsec esp-group ESP0 mode tunnel"
-    Command "set vpn ipsec esp-group ESP0 pfs enable"
-    Command "set vpn ipsec esp-group ESP0 proposal 1 encryption aes256"
-    Command "set vpn ipsec esp-group ESP0 proposal 1 hash sha1"
+    Command set vpn ipsec esp-group ESP0 compression disable
+    Command set vpn ipsec esp-group ESP0 lifetime 3600
+    Command set vpn ipsec esp-group ESP0 mode tunnel
+    Command set vpn ipsec esp-group ESP0 pfs enable
+    Command set vpn ipsec esp-group ESP0 proposal 1 encryption aes256
+    Command set vpn ipsec esp-group ESP0 proposal 1 hash sha1
     
     CONFIG_CHANGED=TRUE
 else
@@ -181,15 +194,15 @@ if [[ $(echo "${VALIDATE_IKE_GROUP}" | grep -i 'empty') ]]
 then
     Log "IKE group IKE0 not found in configuration. Create."
     
-    Command "set vpn ipsec ike-group IKE0 dead-peer-detection action restart"
-    Command "set vpn ipsec ike-group IKE0 dead-peer-detection interval 20"
-    Command "set vpn ipsec ike-group IKE0 dead-peer-detection timeout 120"
-    Command "set vpn ipsec ike-group IKE0 ikev2-reauth no"
-    Command "set vpn ipsec ike-group IKE0 key-exchange ikev1"
-    Command "set vpn ipsec ike-group IKE0 lifetime 28800"
-    Command "set vpn ipsec ike-group IKE0 proposal 1 dh-group 14"
-    Command "set vpn ipsec ike-group IKE0 proposal 1 encryption aes256"
-    Command "set vpn ipsec ike-group IKE0 proposal 1 hash sha1"
+    Command set vpn ipsec ike-group IKE0 dead-peer-detection action restart
+    Command set vpn ipsec ike-group IKE0 dead-peer-detection interval 20
+    Command set vpn ipsec ike-group IKE0 dead-peer-detection timeout 120
+    Command set vpn ipsec ike-group IKE0 ikev2-reauth no
+    Command set vpn ipsec ike-group IKE0 key-exchange ikev1
+    Command set vpn ipsec ike-group IKE0 lifetime 28800
+    Command set vpn ipsec ike-group IKE0 proposal 1 dh-group 14
+    Command set vpn ipsec ike-group IKE0 proposal 1 encryption aes256
+    Command set vpn ipsec ike-group IKE0 proposal 1 hash sha1
     
     CONFIG_CHANGED=TRUE
 else
@@ -216,29 +229,36 @@ then
     
     if [[ -e $PEER_FILE ]]
     then
-        LAST_PEER=$(< ${PEER_FILE})
-        VALIDATE_DELETE=$(${WR} delete vpn ipsec site-to-site peer ${LAST_PEER})
-        if [[ ! $(echo "${VALIDATE_DELETE}" | grep -i 'nothing') ]]
+        LAST_REMOTE_ADDRESS=$(< ${PEER_FILE})
+        Verbose "Last remote address ${LAST_REMOTE_ADDRESS} found."
+        
+        if [[ $DEBUG == FALSE ]]
         then
-            Log "Existing site-to-site peer deleted."
+            VALIDATE_DELETE=$(${WR} delete vpn ipsec site-to-site peer ${LAST_REMOTE_ADDRESS})
+            if [[ ! $(echo "${VALIDATE_DELETE}" | grep -i 'nothing') ]]
+            then
+                Log "Existing site-to-site peer deleted."
+            fi
         fi
+    else
+        Verbose "Peer file ${PEER_FILE} not found."
     fi
     
     Log "Set up new site-to-site peer configuration."
     (echo "${REMOTE_ADDRESS}" > ${PEER_FILE}) &> /dev/null
-    Verbose "Write remote address ${REMOTE_ADDRESS} in ${PEER_FILE}."
+    Verbose "Write remote address ${REMOTE_ADDRESS} to ${PEER_FILE}."
     
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} description \"CUSTOM_BY_SCRIPT\""
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} authentication id ${LOCAL_HOST}"
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} authentication remote-id ${REMOTE_HOST}"
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} authentication mode pre-shared-secret"
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} authentication pre-shared-secret ${PRE_SHARED_SECRET}"
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} connection-type initiate"
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} ike-group IKE0"
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} ikev2-reauth inherit"
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} local-address ${LOCAL_ADDRESS}"
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} vti bind vti64"
-    Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} vti esp-group ESP0"
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} description "CUSTOM_BY_SCRIPT"
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} authentication id ${LOCAL_HOST}
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} authentication remote-id ${REMOTE_HOST}
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} authentication mode pre-shared-secret
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} authentication pre-shared-secret ${PRE_SHARED_SECRET}
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} connection-type initiate
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} ike-group IKE0
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} ikev2-reauth inherit
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} local-address ${LOCAL_ADDRESS}
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} vti bind vti64
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} vti esp-group ESP0
     
     CONFIG_CHANGED=TRUE
 else
@@ -250,7 +270,7 @@ else
     if [[ $CURRENT_LOCAL_ADDRESS != $LOCAL_ADDRESS ]]
     then
         Log "Local address change detected. Updating config."
-        Command "set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} local-address ${LOCAL_ADDRESS}"
+        Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} local-address ${LOCAL_ADDRESS}
         
         CONFIG_CHANGED=TRUE
     else
@@ -261,15 +281,15 @@ fi
 if [[ $CONFIG_CHANGED == TRUE ]]
 then
     Log "Commit configuration."
-    Command "commit"
+    Command commit
     
-    Verbose "Restart VPN service..."
-    restart vpn
+    #Verbose "Restart VPN service..."
+    #restart vpn
 else
     Verbose "Nothing to commit."
 fi
 
 # End configuration
-Command "end"
+Command end
 
 exit 0
