@@ -30,6 +30,21 @@ Verbose()
     fi
 }
 
+Command()
+{
+    if [[ $VERBOSE == TRUE ]]
+    then
+        echo -e "\e[1;41mVyatta Command:\e[0m $@"
+    elif [[ $DEBUG == TRUE ]]
+    then
+        echo "$@"
+    fi
+    if [[ $DEBUG == FALSE ]]
+    then
+        $WR $@
+    fi
+}
+
 Reset()
 {
     echo "Reset all configuration changes."
@@ -63,9 +78,16 @@ PEER_FILE="/config/vpn-site-to-site.peer"
 NAME="vpn-site-to-site-reconfigure"
 WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
 
-# Set alias for command
-shopt -s expand_aliases
-alias Command=$WR
+# Make sure script is run as group vyattacfg
+if [[ $(id -ng) != "vyattacfg" ]]
+then
+    Verbose "Script run in wrong scope. Restart."
+    exec sg vyattacfg -c "$0 $@"
+fi
+
+# Export env variable to override default session id
+#export PPID=$PPID
+#export CMD_WRAPPER_SESSION_ID=$NAME
 
 while getopts ":dhrv" option
 do
@@ -78,13 +100,6 @@ do
       v) VERBOSE=TRUE;;
    esac
 done
-
-# Make sure script is run as group vyattacfg
-if [[ $(id -ng) != "vyattacfg" ]]
-then
-    Verbose "Script run in wrong scope. Restart."
-    exec sg vyattacfg -c "$0 $@"
-fi
 
 if [[ ! -e $CONFIG_FILE ]]
 then
@@ -232,13 +247,11 @@ then
         LAST_REMOTE_ADDRESS=$(< ${PEER_FILE})
         Verbose "Last remote address ${LAST_REMOTE_ADDRESS} found."
         
-        if [[ $DEBUG == FALSE ]]
+        VALIDATE_LAST_PEER=$(${WR} show vpn ipsec site-to-site peer ${LAST_REMOTE_ADDRESS})
+        if [[ ! $(echo "${VALIDATE_LAST_PEER}" | grep -i 'empty') ]]
         then
-            VALIDATE_DELETE=$(${WR} delete vpn ipsec site-to-site peer ${LAST_REMOTE_ADDRESS})
-            if [[ ! $(echo "${VALIDATE_DELETE}" | grep -i 'nothing') ]]
-            then
-                Log "Existing site-to-site peer deleted."
-            fi
+            Log "Try to delete the existing site-to-site peer configuration."
+            Command delete vpn ipsec site-to-site peer ${LAST_REMOTE_ADDRESS} to ${REMOTE_ADDRESS}
         fi
     else
         Verbose "Peer file ${PEER_FILE} not found."
@@ -283,8 +296,11 @@ then
     Log "Commit configuration."
     Command commit
     
-    #Verbose "Restart VPN service..."
-    #restart vpn
+    if [[ $DEBUG == FALSE ]]
+    then
+        Verbose "Restart VPN service..."
+        /opt/vyatta/bin/vyatta-op-cmd-wrapper restart vpn
+    fi
 else
     Verbose "Nothing to commit."
 fi
