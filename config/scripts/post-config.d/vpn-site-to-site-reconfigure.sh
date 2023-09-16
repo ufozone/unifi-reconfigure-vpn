@@ -2,7 +2,7 @@
 # File: vpn-site-to-site-reconfigure.sh
 # Author: ufozone
 # Date: 2023-01-29
-# Version: 2.1
+# Version: 2.1.1
 # Desc: UniFi Site-to-Site IPsec VTI VPN does not detect a change of WAN IP address.
 #       This script checks periodically the current WAN IP addresses of both sites and 
 #       updates the configuration.
