@@ -44,6 +44,9 @@ Change the variables:
 | SITE_A_NETWORKS   | Networks of site A which are to be routed                          | CIDR format space seperated  |
 | SITE_B_NETWORKS   | Networks of site B which are to be routed                          | CIDR format space seperated  |
 | PRE_SHARED_SECRET | Pre shared key                                                     | Secret with 24 or more bytes |
+| VTI_BIND          | Name of Virtual Tunnel Interface                                   | vti[0-255] Default: vti64    |
+| ESP_GROUP         | Name of ESP Group                                                  | ESP[0-255] Default: ESP0     |
+| IKE_GROUP         | Name of IKE Group                                                  | IKE[0-255] Default: IKE0     |
 
 Make sure to convert both files to LF.
 
