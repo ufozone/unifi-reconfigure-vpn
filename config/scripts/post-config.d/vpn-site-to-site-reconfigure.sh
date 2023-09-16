@@ -48,12 +48,64 @@ Command()
 Reset()
 {
     echo "Reset all configuration changes."
+    echo ""
+    
+    echo -e "\e[0;41mStart...\e[0m\e[0;33m"
     $WR begin
     $WR load
-    echo "Commit..."
+    
+    VTI_BIND_FOUND=FALSE
+    IFS=$'\n'
+    
+    VALIDATE_PEERS=$(${WR} show vpn ipsec site-to-site peer)
+    for FOUND_PEER in $(echo "${VALIDATE_PEERS}" | grep -Po 'peer \b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b')
+    do
+        FOUND_PEER_ADDRESS=$(echo $FOUND_PEER | grep -Pom 1 '\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b' | head -n1)
+        VALIDATE_PEER=$(${WR} show vpn ipsec site-to-site peer ${FOUND_PEER_ADDRESS})
+        if [[ $(echo "${VALIDATE_PEER}" | grep -i "${VTI_BIND}") ]]
+        then
+            echo -e "\e[0;41mPeer with VTI interface ${VTI_BIND} found. Try to delete...\e[0m\e[0;33m"
+            $WR delete vpn ipsec site-to-site peer ${FOUND_PEER_ADDRESS}
+            VTI_BIND_FOUND=TRUE
+        fi
+    done
+    
+    VALIDATE_ROUTES=$(${WR} show protocols static interface-route)
+    for FOUND_ROUTE in $(echo "${VALIDATE_ROUTES}" | grep -Po 'interface-route \b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}\b')
+    do
+        FOUND_ROUTE_ADDRESS=$(echo $FOUND_ROUTE | grep -Pom 1 '\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}\b' | head -n1)
+        VALIDATE_ROUTE=$(${WR} show protocols static interface-route ${FOUND_ROUTE_ADDRESS})
+        if [[ $(echo "${VALIDATE_ROUTE}" | grep -i "${VTI_BIND}") ]]
+        then
+            #echo -e "\e[0;41mStatic route ${FOUND_ROUTE_ADDRESS} with VTI interface ${VTI_BIND} found. Try to delete...\e[0m\e[0;33m"
+            #$WR delete protocols static interface-route ${FOUND_ROUTE_ADDRESS} next-hop-interface ${VTI_BIND}
+            VTI_BIND_FOUND=TRUE
+        fi
+    done
+    
+    unset IFS
+    
+    if [[ $VTI_BIND_FOUND == TRUE ]]
+    then
+        echo -e "\e[0;41mTry to delete VTI interface ${VTI_BIND}...\e[0m\e[0;33m"
+        $WR delete interfaces vti ${VTI_BIND}
+    fi
+    
+    echo -e "\e[0;41mTry to delete ESP group ESP0...\e[0m\e[0;33m"
+    $WR delete vpn ipsec esp-group ESP0
+    
+    echo -e "\e[0;41mTry to delete IKE group IKE0...\e[0m\e[0;33m"
+    $WR delete vpn ipsec ike-group IKE0
+    
+    echo -e "\e[0m\e[0;41mCommit...\e[0m\e[0;33m"
     $WR commit
     $WR end
-    echo "Finished."
+    
+    echo -e "\e[0m\e[0;41mRestart VPN service...\e[0m\e[0;33m"
+    /opt/vyatta/bin/vyatta-op-cmd-wrapper restart vpn
+    
+    echo -e "\e[0m\e[0;41mFinished.\e[0m"
+    Log "Reset site-to-site peer configuration."
 }
 
 Help()
@@ -70,14 +122,6 @@ Help()
     echo
 }
 
-VERBOSE=FALSE
-DEBUG=FALSE
-CONFIG_CHANGED=FALSE
-CONFIG_FILE="/config/vpn-site-to-site.conf"
-PEER_FILE="/config/vpn-site-to-site.peer"
-NAME="vpn-site-to-site-reconfigure"
-WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
-
 # Make sure script is run as group vyattacfg
 if [[ $(id -ng) != "vyattacfg" ]]
 then
@@ -85,21 +129,14 @@ then
     exec sg vyattacfg -c "$0 $@"
 fi
 
-# Export env variable to override default session id
-#export PPID=$PPID
-#export CMD_WRAPPER_SESSION_ID=$NAME
-
-while getopts ":dhrv" option
-do
-   case ${option} in
-      d) DEBUG=TRUE;;
-      h) Help
-         exit;;
-      r) Reset
-         exit;;
-      v) VERBOSE=TRUE;;
-   esac
-done
+VERBOSE=FALSE
+DEBUG=FALSE
+CONFIG_CHANGED=FALSE
+CONFIG_FILE="/config/vpn-site-to-site.conf"
+PEER_FILE="/config/vpn-site-to-site.peer"
+NAME="vpn-site-to-site-reconfigure"
+WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
+VTI_BIND="vti64"
 
 if [[ ! -e $CONFIG_FILE ]]
 then
@@ -127,11 +164,23 @@ else
     REMOTE_NETWORKS=$SITE_A_NETWORKS
 fi
 
+while getopts ":dhrv" option
+do
+   case ${option} in
+      d) DEBUG=TRUE;;
+      h) Help
+         exit;;
+      r) Reset
+         exit;;
+      v) VERBOSE=TRUE;;
+   esac
+done
+
 # Get local and remote addresses via DDNS lookup
-GET_LOCAL_ADDRESS=$(host -st A ${LOCAL_HOST})
-LOCAL_ADDRESS=$(echo ${GET_LOCAL_ADDRESS} | grep -Pom 1 '\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b' | head -n1)
-GET_REMOTE_ADDRESS=$(host -st A ${REMOTE_HOST})
-REMOTE_ADDRESS=$(echo ${GET_REMOTE_ADDRESS} | grep -Pom 1 '\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b' | head -n1)
+GET_LOCAL_ADDRESS=$(host -st A $LOCAL_HOST)
+LOCAL_ADDRESS=$(echo $GET_LOCAL_ADDRESS | grep -Pom 1 '\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b' | head -n1)
+GET_REMOTE_ADDRESS=$(host -st A $REMOTE_HOST)
+REMOTE_ADDRESS=$(echo $GET_REMOTE_ADDRESS | grep -Pom 1 '\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b' | head -n1)
 
 if [[ $LOCAL_ADDRESS == "" ]]
 then
@@ -152,24 +201,24 @@ fi
 Command begin
 
 # Check current site-to-site VPN configuration over path
-VALIDATE_INTERFACE=$(${WR} show interfaces vti vti64 address)
+VALIDATE_INTERFACE=$(${WR} show interfaces vti ${VTI_BIND} address)
 if [[ $(echo "${VALIDATE_INTERFACE}" | grep -i 'empty') ]]
 then
-    Log "VTI interface not found in configuration. Create."
-    Command set interfaces vti vti64 address ${TRANSFER_ADDRESS}
+    Log "VTI interface ${VTI_BIND} not found in configuration. Create."
+    Command set interfaces vti ${VTI_BIND} address ${TRANSFER_ADDRESS}
     
     CONFIG_CHANGED=TRUE
 else
-    Verbose "VTI interface with ${VALIDATE_INTERFACE} found in configuration."
+    Verbose "VTI interface ${VTI_BIND} with ${VALIDATE_INTERFACE} found in configuration."
 fi
 
 for REMOTE_NETWORK in `echo ${REMOTE_NETWORKS}`
 do
-    VALIDATE_ROUTE=$(${WR} show protocols static interface-route ${REMOTE_NETWORK} next-hop-interface vti64)
+    VALIDATE_ROUTE=$(${WR} show protocols static interface-route ${REMOTE_NETWORK} next-hop-interface ${VTI_BIND})
     if [[ $(echo "${VALIDATE_ROUTE}" | grep -i 'empty') ]]
     then
         Log "Static route ${REMOTE_NETWORK} not found. Create."
-        Command set protocols static interface-route ${REMOTE_NETWORK} next-hop-interface vti64 distance 30
+        Command set protocols static interface-route ${REMOTE_NETWORK} next-hop-interface ${VTI_BIND} distance 30
         
         CONFIG_CHANGED=TRUE
     else
@@ -251,7 +300,7 @@ then
         if [[ ! $(echo "${VALIDATE_LAST_PEER}" | grep -i 'empty') ]]
         then
             Log "Try to delete the existing site-to-site peer configuration."
-            Command delete vpn ipsec site-to-site peer ${LAST_REMOTE_ADDRESS} to ${REMOTE_ADDRESS}
+            Command delete vpn ipsec site-to-site peer ${LAST_REMOTE_ADDRESS}
         fi
     else
         Verbose "Peer file ${PEER_FILE} not found."
@@ -270,7 +319,7 @@ then
     Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} ike-group IKE0
     Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} ikev2-reauth inherit
     Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} local-address ${LOCAL_ADDRESS}
-    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} vti bind vti64
+    Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} vti bind ${VTI_BIND}
     Command set vpn ipsec site-to-site peer ${REMOTE_ADDRESS} vti esp-group ESP0
     
     CONFIG_CHANGED=TRUE
