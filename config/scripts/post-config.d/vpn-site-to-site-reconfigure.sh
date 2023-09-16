@@ -50,7 +50,7 @@ Reset()
     echo "Reset all configuration changes."
     echo ""
     
-    echo -e "\e[0;41mStart...\e[0m\e[0;33m"
+    echo -e "\e[0m\e[1;42mStart...\e[0m\e[0;33m"
     $WR begin
     $WR load
     
@@ -64,48 +64,35 @@ Reset()
         VALIDATE_PEER=$(${WR} show vpn ipsec site-to-site peer ${FOUND_PEER_ADDRESS})
         if [[ $(echo "${VALIDATE_PEER}" | grep -i "${VTI_BIND}") ]]
         then
-            echo -e "\e[0;41mPeer with VTI interface ${VTI_BIND} found. Try to delete...\e[0m\e[0;33m"
+            echo -e "\e[0m\e[1;42mPeer with VTI interface ${VTI_BIND} found. Try to delete...\e[0m\e[0;33m"
             $WR delete vpn ipsec site-to-site peer ${FOUND_PEER_ADDRESS}
             VTI_BIND_FOUND=TRUE
         fi
     done
     
-    VALIDATE_ROUTES=$(${WR} show protocols static interface-route)
-    for FOUND_ROUTE in $(echo "${VALIDATE_ROUTES}" | grep -Po 'interface-route \b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}\b')
-    do
-        FOUND_ROUTE_ADDRESS=$(echo $FOUND_ROUTE | grep -Pom 1 '\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{1,2}\b' | head -n1)
-        VALIDATE_ROUTE=$(${WR} show protocols static interface-route ${FOUND_ROUTE_ADDRESS})
-        if [[ $(echo "${VALIDATE_ROUTE}" | grep -i "${VTI_BIND}") ]]
-        then
-            #echo -e "\e[0;41mStatic route ${FOUND_ROUTE_ADDRESS} with VTI interface ${VTI_BIND} found. Try to delete...\e[0m\e[0;33m"
-            #$WR delete protocols static interface-route ${FOUND_ROUTE_ADDRESS} next-hop-interface ${VTI_BIND}
-            VTI_BIND_FOUND=TRUE
-        fi
-    done
-    
-    unset IFS
-    
     if [[ $VTI_BIND_FOUND == TRUE ]]
     then
-        echo -e "\e[0;41mTry to delete VTI interface ${VTI_BIND}...\e[0m\e[0;33m"
+        echo -e "\e[0m\e[1;42mTry to delete VTI interface ${VTI_BIND}...\e[0m\e[0;33m"
         $WR delete interfaces vti ${VTI_BIND}
     fi
     
-    echo -e "\e[0;41mTry to delete ESP group ESP0...\e[0m\e[0;33m"
+    echo -e "\e[0m\e[1;42mTry to delete ESP group ESP0...\e[0m\e[0;33m"
     $WR delete vpn ipsec esp-group ESP0
     
-    echo -e "\e[0;41mTry to delete IKE group IKE0...\e[0m\e[0;33m"
+    echo -e "\e[0m\e[1;42mTry to delete IKE group IKE0...\e[0m\e[0;33m"
     $WR delete vpn ipsec ike-group IKE0
     
-    echo -e "\e[0m\e[0;41mCommit...\e[0m\e[0;33m"
+    echo -e "\e[0m\e[1;42mCommit...\e[0m\e[0;33m"
     $WR commit
     $WR end
     
-    echo -e "\e[0m\e[0;41mRestart VPN service...\e[0m\e[0;33m"
+    echo -e "\e[0m\e[1;42mRestart VPN service...\e[0m\e[0;33m"
     /opt/vyatta/bin/vyatta-op-cmd-wrapper restart vpn
     
-    echo -e "\e[0m\e[0;41mFinished.\e[0m"
+    echo -e "\e[0m\e[1;42mFinished.\e[0m"
     Log "Reset site-to-site peer configuration."
+    
+    unset IFS
 }
 
 Help()
