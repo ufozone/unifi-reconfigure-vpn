@@ -92,7 +92,7 @@ For more information, see this community thread: [Site-to-site VPN and MSS clamp
 ### Gateway (USG) can not reach remote networks
 The perfect explanation can be found here: [IPSEC Auto VPN and ping router-to-router](https://community.ui.com/questions/IPSEC-Auto-VPN-and-ping-router-to-router/c97b532b-e7fe-4f4a-9b90-54624b12b53d)
 
-If the problem affects you, you only need to replace the script on the USG(s) with version 2.2 (or higher). Since this version, the script generates a static route to 10.255.254.0/24, which points to the VTI bind.
+If the problem affects you, you only need to replace the script on the USG(s) with version 2.2 (or higher). Since this version, the script generates a static route to the transfer network (10.255.254.0/24), which points to the VTI bind (vti64 by default).
 
 Troubleshooting
 -----------
