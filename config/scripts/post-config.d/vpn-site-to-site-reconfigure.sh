@@ -2,7 +2,7 @@
 # File: vpn-site-to-site-reconfigure.sh
 # Author: ufozone
 # Date: 2023-01-29
-# Version: 2.1.1
+# Version: 2.1.2
 # Desc: UniFi Site-to-Site IPsec VTI VPN does not detect a change of WAN IP address.
 #       This script checks periodically the current WAN IP addresses of both sites and 
 #       updates the configuration.
@@ -78,6 +78,9 @@ Reset()
         echo -e "\e[0m\e[1;42mTry to delete ESP group ${ESP_GROUP}...\e[0m\e[0;33m"
         $WR delete vpn ipsec esp-group $ESP_GROUP
         
+        echo -e "\e[0m\e[1;42mTry to delete static route to ${TRANSFER_NETWORK} via ${VTI_BIND}...\e[0m\e[0;33m"
+        $WR delete protocols static interface-route $TRANSFER_NETWORK next-hop-interface $VTI_BIND
+        
         echo -e "\e[0m\e[1;42mTry to delete VTI interface ${VTI_BIND}...\e[0m\e[0;33m"
         $WR delete interfaces vti $VTI_BIND
     fi
@@ -137,6 +140,7 @@ then
     exit 1
 fi
 
+TRANSFER_NETWORK="10.255.254.0/24"
 if [[ $THIS_SITE == "A" ]]
 then
     TRANSFER_ADDRESS="10.255.254.1/32"
@@ -213,10 +217,22 @@ else
     Verbose "VTI interface ${VTI_BIND} with ${VALIDATE_INTERFACE} found in configuration."
 fi
 
+VALIDATE_TRANSFER_ROUTE=$($WR show protocols static interface-route $TRANSFER_NETWORK next-hop-interface)
+if [[ ! $(echo $VALIDATE_TRANSFER_ROUTE | grep -i "next-hop-interface ${VTI_BIND}" | head -n1) ]]
+then
+    Log "Static route ${TRANSFER_NETWORK} not found. Create."
+    Command set protocols static interface-route $TRANSFER_NETWORK next-hop-interface $VTI_BIND
+    
+    CONFIG_CHANGED=TRUE
+    Verbose "Static route ${TRANSFER_NETWORK} not found."
+else
+    Verbose "Static route ${TRANSFER_NETWORK} found."
+fi
+
 for REMOTE_NETWORK in `echo ${REMOTE_NETWORKS}`
 do
-    VALIDATE_ROUTE=$($WR show protocols static interface-route $REMOTE_NETWORK next-hop-interface $VTI_BIND)
-    if [[ $(echo "${VALIDATE_ROUTE}" | grep -i 'empty') ]]
+    VALIDATE_REMOTE_ROUTE=$($WR show protocols static interface-route $REMOTE_NETWORK next-hop-interface $VTI_BIND)
+    if [[ $(echo "${VALIDATE_REMOTE_ROUTE}" | grep -i 'empty') ]]
     then
         Log "Static route ${REMOTE_NETWORK} not found. Create."
         Command set protocols static interface-route $REMOTE_NETWORK next-hop-interface $VTI_BIND distance 30
