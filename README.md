@@ -90,7 +90,9 @@ In my case, I have set the value to 1328, because pppoe interface has MTU 1492 a
 For more information, see this community thread: [Site-to-site VPN and MSS clamping](https://community.ui.com/questions/Site-to-site-VPN-and-MSS-clamping/9ec02bdb-f327-4e6e-9199-bbdc5f639904)
 
 ### Gateway (USG) can not reach remote networks
-I don't know why (yet).
+The perfect explanation can be found here: [IPSEC Auto VPN and ping router-to-router](https://community.ui.com/questions/IPSEC-Auto-VPN-and-ping-router-to-router/c97b532b-e7fe-4f4a-9b90-54624b12b53d)
+
+If the problem affects you, you only need to replace the script on the USG(s) with version 2.2 (or higher). Since this version, the script generates a static route to 10.255.254.0/24, which points to the VTI bind.
 
 Troubleshooting
 -----------
