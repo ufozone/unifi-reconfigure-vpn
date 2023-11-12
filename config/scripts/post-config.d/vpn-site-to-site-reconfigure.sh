@@ -218,7 +218,7 @@ else
 fi
 
 VALIDATE_TRANSFER_ROUTE=$($WR show protocols static interface-route $TRANSFER_NETWORK next-hop-interface)
-if [[ ! $(echo $VALIDATE_TRANSFER_ROUTE | grep -i "next-hop-interface ${VTI_BIND}" | head -n1) ]]
+if [[ ! $(echo $VALIDATE_TRANSFER_ROUTE | grep -i "next-hop-interface ${VTI_BIND}") ]]
 then
     Log "Static route ${TRANSFER_NETWORK} not found. Create."
     Command set protocols static interface-route $TRANSFER_NETWORK next-hop-interface $VTI_BIND
