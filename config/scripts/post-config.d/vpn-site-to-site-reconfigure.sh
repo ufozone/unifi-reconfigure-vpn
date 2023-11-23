@@ -2,7 +2,7 @@
 # File: vpn-site-to-site-reconfigure.sh
 # Author: ufozone
 # Date: 2023-01-29
-# Version: 2.2
+# Version: 2.2.1
 # Desc: UniFi Site-to-Site IPsec VTI VPN does not detect a change of WAN IP address.
 #       This script checks periodically the current WAN IP addresses of both sites and 
 #       updates the configuration.
@@ -78,8 +78,9 @@ Reset()
         echo -e "\e[0m\e[1;42mTry to delete ESP group ${ESP_GROUP}...\e[0m\e[0;33m"
         $WR delete vpn ipsec esp-group $ESP_GROUP
         
-        echo -e "\e[0m\e[1;42mTry to delete static route to ${TRANSFER_NETWORK} to point out ${VTI_BIND}...\e[0m\e[0;33m"
-        $WR delete protocols static interface-route $TRANSFER_NETWORK next-hop-interface $VTI_BIND
+        # Issue #1: Commit failed
+        #echo -e "\e[0m\e[1;42mTry to delete static route to ${TRANSFER_NETWORK} to point out ${VTI_BIND}...\e[0m\e[0;33m"
+        #$WR delete protocols static interface-route $TRANSFER_NETWORK next-hop-interface $VTI_BIND
         
         echo -e "\e[0m\e[1;42mTry to delete VTI interface ${VTI_BIND}...\e[0m\e[0;33m"
         $WR delete interfaces vti $VTI_BIND
