@@ -18,7 +18,7 @@ Log()
     fi
     if [[ $DEBUG == FALSE ]]
     then
-        logger -t $NAME -- "$@"
+        logger -t "$NAME" -- "$@"
     fi
 }
 
@@ -104,12 +104,13 @@ Help()
     echo "UniFi Site-to-Site IPsec VTI VPN does not detect a change of WAN IP address."
     echo "This script checks periodically the current WAN IP addresses of both sites and updates the configuration."
     echo
-    echo "Syntax: ${NAME}.sh [-d|h|v]"
+    echo "Syntax: ${0##*/} [-d|h|v|c <file>]"
     echo "Options:"
-    echo "d     Debug mode. Does not make any changes to the configuration, but displays them."
-    echo "h     Print this Help."
-    echo "r     Reset all configuration changes."
-    echo "v     Verbose mode. It provides additional details."
+    echo "c <file> Config file. Default: /config/vpn-site-to-site.conf"  
+    echo "d        Debug mode. Does not make any changes to the configuration, but displays them."
+    echo "h        Print this Help."
+    echo "r        Reset all configuration changes."
+    echo "v        Verbose mode. It provides additional details."
     echo
 }
 
@@ -122,39 +123,78 @@ fi
 
 VERBOSE=FALSE
 DEBUG=FALSE
+RESET=FALSE
 CONFIG_CHANGED=FALSE
-CONFIG_FILE="/config/vpn-site-to-site.conf"
-PEER_FILE="/config/vpn-site-to-site.peer"
 NAME="vpn-site-to-site-reconfigure"
 WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
+CONFIG_FILE="/config/vpn-site-to-site.conf"
+
+while getopts ":dhrvc:" option
+do
+   case $option in
+      c) # -c <file> -- Config file
+         CONFIG_FILE=${OPTARG}
+         NAME="${NAME}(${CONFIG_FILE##*/})";;
+      d) # -d -- Debug
+         DEBUG=TRUE;;
+      r) # -r -- Reset
+         RESET=TRUE;;
+      v) # -v -- Verbose
+         VERBOSE=TRUE;;
+      h) # -h -- Help
+         Help
+         exit;;
+      \?) # ???
+         echo "Invalid option"
+         Help
+         exit;;
+   esac
+done
 
 if [[ ! -e $CONFIG_FILE ]]
 then
-    Log "File vpn-site-to-site.conf not found. Abort."
+    Log "File ${$CONFIG_FILE} not found. Abort."
     exit 1
 fi
+
+PEER_FILE="${CONFIG_FILE##*/}"
+PEER_FILE="/config/${PEER_FILE%.*}.peer"
+
+# Load the configuration
 source $CONFIG_FILE
 
-if [[ ( ( $THIS_SITE != "A" ) && ( $THIS_SITE != "B" ) ) || ( $SITE_A_HOST == "" ) || ( $SITE_B_HOST == "" ) || ( $PRE_SHARED_SECRET == "" ) ]]
+if [[ ! -n $DESCRIPTION ]]
+then
+    DESCRIPTION="CUSTOM_BY_SCRIPT"
+fi
+
+if [[ ( $LOCAL_HOST == "" ) || ( $REMOTE_HOST == "" ) || ( $PRE_SHARED_SECRET == "" ) ]]
 then
     Log "Configuration in vpn-site-to-site.conf is invalid. Abort."
     exit 1
 fi
 
-TRANSFER_NETWORK="10.255.254.0/24"
-if [[ $THIS_SITE == "A" ]]
+# Transfer Network Details
+if [[ ! -n $TRANSFER_NETWORK ]]
 then
-    TRANSFER_ADDRESS="10.255.254.1/32"
-    LOCAL_HOST=$SITE_A_HOST
-    REMOTE_HOST=$SITE_B_HOST
-    REMOTE_NETWORKS=$SITE_B_NETWORKS
-else
-    TRANSFER_ADDRESS="10.255.254.2/32"
-    LOCAL_HOST=$SITE_B_HOST
-    REMOTE_HOST=$SITE_A_HOST
-    REMOTE_NETWORKS=$SITE_A_NETWORKS
+    TRANSFER_NETWORK="10.255.254.0/30"
+fi
+if [[ ! -n $LOCAL_TRANSFER_ADDRESS ]]
+then
+    LOCAL_TRANSFER_ADDRESS="10.255.254.1/30"
+fi
+if [[ ! -n $REMOTE_TRANSFER_ADDRESS ]]
+then
+    REMOTE_TRANSFER_ADDRESS="10.255.254.2/30"
 fi
 
+# Route Distance
+if [[ ! -n $DISTANCE ]]
+then
+    DISTANCE=30
+fi
+
+# Name of Virtual Tunnel Interface
 if [[ ! -n $VTI_BIND ]]
 then
     VTI_BIND="vti64"
@@ -170,17 +210,85 @@ then
     IKE_GROUP="IKE0"
 fi
 
-while getopts ":dhrv" option
-do
-   case $option in
-      d) DEBUG=TRUE;;
-      h) Help
-         exit;;
-      r) Reset
-         exit;;
-      v) VERBOSE=TRUE;;
-   esac
-done
+# Connection type
+if [[ ! -n $CONNECTION_TYPE ]]
+then
+    CONNECTION_TYPE="initiate"
+fi
+
+# ESP Settings
+if [[ ! -n $ESP_COMPRESSION ]]
+then
+    ESP_COMPRESSION="disable"
+fi
+if [[ ! -n $ESP_LIFETIME ]]
+then
+    ESP_LIFETIME=3600
+fi
+if [[ ! -n $ESP_MODE ]]
+then
+#  tunnel        Tunnel mode (default)
+#  transport     Transport mode
+    ESP_MODE="tunnel"
+fi
+if [[ ! -n $ESP_PFS ]]
+then
+    ESP_PFS="enable"
+fi
+if [[ ! -n $ESP_ENCRYPTION ]]
+then
+    ESP_ENCRYPTION="aes256"
+fi
+if [[ ! -n $ESP_HASH ]]
+then
+    ESP_HASH="sha512"
+fi
+
+# IKE Settings
+if [[ ! -n $IKE_DPD_ACTION ]]
+then
+    IKE_DPD_ACTION="restart"
+fi
+if [[ ! -n $IKE_DPD_INTERVAL ]]
+then
+    IKE_DPD_INTERVAL=20
+fi
+if [[ ! -n $IKE_DPD_TIMEOUT ]]
+then
+    IKE_DPD_TIMEOUT=120
+fi
+if [[ ! -n $IKE_IKEV2_REAUTH ]]
+then
+    IKE_IKEV2_REAUTH="no"
+fi
+if [[ ! -n $IKE_KEYEXCHANGE ]]
+then
+    IKE_KEYEXCHANGE="ikev2"
+fi
+if [[ ! -n $IKE_LIFETIME ]]
+then
+    IKE_LIFETIME=28800
+fi
+if [[ ! -n $IKE_DHGROUP ]]
+then
+    IKE_DHGROUP=16
+fi
+if [[ ! -n $IKE_ENCRYPTION ]]
+then
+    IKE_ENCRYPTION="aes256"
+fi
+if [[ ! -n $IKE_HASH ]]
+then
+    IKE_HASH="sha512"
+fi
+
+
+if [[ $RESET == TRUE ]]
+then
+    Reset
+    exit
+fi
+
 
 # Get local and remote addresses via DDNS lookup
 GET_LOCAL_ADDRESS=$(host -st A $LOCAL_HOST)
@@ -236,7 +344,7 @@ do
     if [[ $(echo "${VALIDATE_REMOTE_ROUTE}" | grep -i 'empty') ]]
     then
         Log "Static route ${REMOTE_NETWORK} not found. Create."
-        Command set protocols static interface-route $REMOTE_NETWORK next-hop-interface $VTI_BIND distance 30
+        Command set protocols static interface-route $REMOTE_NETWORK next-hop-interface $VTI_BIND distance $DISTANCE
         
         CONFIG_CHANGED=TRUE
     else
@@ -260,12 +368,12 @@ if [[ $(echo "${VALIDATE_ESP_GROUP}" | grep -i 'empty') ]]
 then
     Log "ESP group ${ESP_GROUP} not found in configuration. Create."
     
-    Command set vpn ipsec esp-group $ESP_GROUP compression disable
-    Command set vpn ipsec esp-group $ESP_GROUP lifetime 3600
-    Command set vpn ipsec esp-group $ESP_GROUP mode tunnel
-    Command set vpn ipsec esp-group $ESP_GROUP pfs enable
-    Command set vpn ipsec esp-group $ESP_GROUP proposal 1 encryption aes256
-    Command set vpn ipsec esp-group $ESP_GROUP proposal 1 hash sha1
+    Command set vpn ipsec esp-group $ESP_GROUP compression $ESP_COMPRESSION
+    Command set vpn ipsec esp-group $ESP_GROUP lifetime $ESP_LIFETIME
+    Command set vpn ipsec esp-group $ESP_GROUP mode $ESP_MODE
+    Command set vpn ipsec esp-group $ESP_GROUP pfs $ESP_PFS
+    Command set vpn ipsec esp-group $ESP_GROUP proposal 1 encryption $ESP_ENCRYPTION
+    Command set vpn ipsec esp-group $ESP_GROUP proposal 1 hash $ESP_HASH
     
     CONFIG_CHANGED=TRUE
 else
@@ -276,15 +384,15 @@ if [[ $(echo "${VALIDATE_IKE_GROUP}" | grep -i 'empty') ]]
 then
     Log "IKE group ${IKE_GROUP} not found in configuration. Create."
     
-    Command set vpn ipsec ike-group $IKE_GROUP dead-peer-detection action restart
-    Command set vpn ipsec ike-group $IKE_GROUP dead-peer-detection interval 20
-    Command set vpn ipsec ike-group $IKE_GROUP dead-peer-detection timeout 120
-    Command set vpn ipsec ike-group $IKE_GROUP ikev2-reauth no
-    Command set vpn ipsec ike-group $IKE_GROUP key-exchange ikev1
-    Command set vpn ipsec ike-group $IKE_GROUP lifetime 28800
-    Command set vpn ipsec ike-group $IKE_GROUP proposal 1 dh-group 14
-    Command set vpn ipsec ike-group $IKE_GROUP proposal 1 encryption aes256
-    Command set vpn ipsec ike-group $IKE_GROUP proposal 1 hash sha1
+    Command set vpn ipsec ike-group $IKE_GROUP dead-peer-detection action $IKE_DPD_ACTION
+    Command set vpn ipsec ike-group $IKE_GROUP dead-peer-detection interval $IKE_DPD_INTERVAL
+    Command set vpn ipsec ike-group $IKE_GROUP dead-peer-detection timeout $IKE_DPD_TIMEOUT
+    Command set vpn ipsec ike-group $IKE_GROUP ikev2-reauth $IKE_IKEV2_REAUTH
+    Command set vpn ipsec ike-group $IKE_GROUP key-exchange $IKE_KEYEXCHANGE
+    Command set vpn ipsec ike-group $IKE_GROUP lifetime $IKE_LIFETIME
+    Command set vpn ipsec ike-group $IKE_GROUP proposal 1 dh-group $IKE_DHGROUP
+    Command set vpn ipsec ike-group $IKE_GROUP proposal 1 encryption $IKE_ENCRYPTION
+    Command set vpn ipsec ike-group $IKE_GROUP proposal 1 hash $IKE_HASH
     
     CONFIG_CHANGED=TRUE
 else
@@ -328,12 +436,12 @@ then
     (echo "${REMOTE_ADDRESS}" > $PEER_FILE) &> /dev/null
     Verbose "Write remote address ${REMOTE_ADDRESS} to ${PEER_FILE}."
     
-    Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS description "CUSTOM_BY_SCRIPT"
+    Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS description $DESCRIPTION
     Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication id $LOCAL_HOST
     Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication remote-id $REMOTE_HOST
     Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication mode pre-shared-secret
     Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS authentication pre-shared-secret $PRE_SHARED_SECRET
-    Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS connection-type initiate
+    Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS connection-type $CONNECTION_TYPE
     Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS ike-group $IKE_GROUP
     Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS ikev2-reauth inherit
     Command set vpn ipsec site-to-site peer $REMOTE_ADDRESS local-address $LOCAL_ADDRESS
