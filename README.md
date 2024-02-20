@@ -1,8 +1,6 @@
 UniFi: Configure IPsec VTI VPN with dynamic IP on one or both sites
 =========
 
-**ATTENTION: The script only works for a bidirectional site-to-site VPN.**
-
 Development & Pull Request
 -----------
 
@@ -40,117 +38,121 @@ Change these variables:
 |-------------------|--------------------------------------------------------------------|-----------------------------------------|
 | LOCAL_HOST        | Hostname of this site                                              | FQDN with final point                   |
 | REMOTE_HOST       | Hostname of the remote site                                        | FQDN with final point                   |
-| LOCAL_NETWORKS    | Networks of this site which are to be routed                       | CIDR format space seperated             |
 | REMOTE_NETWORKS   | Networks of the remote site which are to be routed                 | CIDR format space seperated             |
 | PRE_SHARED_SECRET | Pre shared key                                                     | Secret with 24 or more bytes            |
-| TRANSFER_NETWORK        | Transfer network                                             | CIDR format. Default: "10.255.254.0/30" |
-| LOCAL_TRANSFER_ADDRESS  | Address of this site in the transfer network                 | CIDR format. Default: "10.255.254.1/30" |
-| REMOTE_TRANSFER_ADDRESS | Address of the remote site in the transfer network           | CIDR format. Default: "10.255.254.2/30" |
+| TRANSFER_NETWORK  | Transfer network                                                   | CIDR format. Default: "10.255.254.0/24" |
+| TRANSFER_ADDRESS  | Address of this site in the transfer network                       | CIDR format. Default: "10.255.254.1/32" |
 
-For more than one IPsec Site-2-Site setup, further change these variables:
+For more than one IPsec site-to-site setup, further change these variables:
 | Variable                | Description                                                  | Values                                  |
 |-------------------------|--------------------------------------------------------------|-----------------------------------------|
 | VTI_BIND                | Name of Virtual Tunnel Interface                             | vti[0-255] Default: vti64               |
 | ESP_GROUP               | Name of ESP Group                                            | ESP[0-255] Default: ESP0                |
 | IKE_GROUP               | Name of IKE Group                                            | IKE[0-255] Default: IKE0                |
 
+Further additional variables are documented in the `vpn-site-to-site.conf`.
+
 Make sure to convert both files to LF.
 
 Execute the script:
 
 ```
-admin@USG-Pro-4:~$ /config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh
+admin@USG-Pro-4:~$ /config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh -v
 ```
 
-Check the logs. Normally you should get an output like the following:
+Check the logs:
 
 ```
 admin@USG-Pro-4:~$ show log | grep 'vpn-site-to-site-reconfigure'
-Jan 29 21:06:07 USG-Pro-4 vpn-site-to-site-reconfigure: Remote address does not change.
-Jan 29 21:06:07 USG-Pro-4 vpn-site-to-site-reconfigure: Local address does not change.
-Jan 29 21:06:07 USG-Pro-4 vpn-site-to-site-reconfigure: Nothing to commit.
+```
+
+After the first run, your output should look like this:
+
+```
+Feb 20 10:15:01 USG-Pro-4 vpn-site-to-site-reconfigure: VTI interface vti64 not found in configuration. Create.
+Feb 20 10:15:01 USG-Pro-4 vpn-site-to-site-reconfigure: Static route 10.255.254.0/24 not found. Create.
+Feb 20 10:15:01 USG-Pro-4 vpn-site-to-site-reconfigure: Static route 10.2.1.0/24/24 not found. Create.
+Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: Firewall group item 10.2.1.0/24/24 not found. Create.
+Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: Static route 10.2.2.0/24/24 not found. Create.
+Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: Firewall group item 10.2.2.0/24/24 not found. Create.
+Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: ESP group ESP0 not found in configuration. Create.
+Feb 20 10:15:03 USG-Pro-4 vpn-site-to-site-reconfigure: IKE group IKE0 not found in configuration. Create.
+Feb 20 10:15:03 USG-Pro-4 vpn-site-to-site-reconfigure: No site-to-site peer configuration found.
+Feb 20 10:15:03 USG-Pro-4 vpn-site-to-site-reconfigure: Set up new site-to-site peer configuration.
+Feb 20 10:15:05 USG-Pro-4 vpn-site-to-site-reconfigure: Commit configuration.
+```
+
+Until an IP address change, your output should normally look like this:
+
+```
+Feb 20 10:20:03 USG-Pro-4 vpn-site-to-site-reconfigure: Remote address does not change.
+Feb 20 10:20:03 USG-Pro-4 vpn-site-to-site-reconfigure: Local address does not change.
+Feb 20 10:20:03 USG-Pro-4 vpn-site-to-site-reconfigure: Nothing to commit.
 ```
 
 ### Edit config.gateway.json
 
-Your `config.gateway.json` needs an addition:
-Merge the contents of the `config.gateway.merge.json` in your `config.gateway.json` for both sites.
+Your `config.gateway.json` needs an addition.
 
-__You have no idea how to find or create the config.gateway.json?__
+#### You have no idea how to find or create the config.gateway.json?
+
 Check this: [UniFi - USG Advanced Configuration Using config.gateway.json](https://help.ui.com/hc/en-us/articles/215458888-UniFi-USG-Advanced-Configuration-Using-config-gateway-json)
 
+#### Set-up only one site-to-site VPN IPsec tunnels
 
-__Multiple IPsec Tunnels__
+Merge the contents of the `config.gateway.merge.json` in your `config.gateway.json` for both sites.
+
+#### Set-up multiple site-to-site VPN IPsec tunnels
+
+Get the content of the `config.gateway.merge.json` and edit the task entry or rather add new task entries in the task scheduler as shown below:
+
 ```
 {
         "system": {
                 "task-scheduler": {
                         "task": {
-                                "ipsecvpn1": {
+                                "vpn-site-to-site1": {
                                         "executable": {
                                                 "path": "/config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh",
-                                                "arguments": "/config/ipsec-vpn1.conf"
+                                                "arguments": "-c/config/vpn-site-to-site1.conf"
                                         },
                                         "interval": "5m"
                                 },
-                                "ipsecvpn2": {
+                                "vpn-site-to-site2": {
                                         "executable": {
                                                 "path": "/config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh",
-                                                "arguments": "/config/ipsec-vpn2.conf"
+                                                "arguments": "-c/config/vpn-site-to-site2.conf"
                                         },
                                         "interval": "5m"
                                 }
                         }
                 }
-        },
-        "vpn": {
-                "ipsec": {
-                        "auto-firewall-nat-exclude": "enable",
-                        "ipsec-interfaces": {
-                                "interface": [
-                                        "pppoe0"
-                                ]
-                        },
-                        "nat-networks": {
-                                "allowed-network": {
-                                        "0.0.0.0/0": "''"
-                                }
-                        },
-                        "nat-traversal": "enable"
-                }
         }
 }
 ```
 
-To test, configure the tasks via CLI (NOT PERSISTENT):
+Make sure that each task has a unique name and that different configuration files are specified as arguments. After all, merge it in your `config.gateway.json` for all sites.
+
+#### Provisioning and testing
+
+Now the changes in your `config.gateway.json` must be provisioned to the USGs. You have no idea how? Click here: [How to Trigger provisioning after changing config.gateway.json](https://community.ui.com/questions/How-to-Trigger-provisioning-after-changing-config-gateway-json-in-Network-Controller-7-3-76/f105a191-7c2c-47ec-9bd1-9ca2d239d25b)
+
+To check whether the tasks have been created on the USGs, you can use the following commands:
+
 ```
-set system task-scheduler task
-Possible completions:
-  <text>        Task name
-
-set system task-scheduler task task_name
-Possible completions:
-  crontab-spec  UNIX crontab specification string
-  executable    Executable path and arguments
-  interval      Execution interval
-
-set system task-scheduler task task_name crontab-spec
-Possible completions:
-  <text>        UNIX crontab specification string
-
-set system task-scheduler task task_name executable
-Possible completions:
-  arguments     Arguments passed to the executable
-  path          Path to executable
-
-set system task-scheduler task task_name interval
-Possible completions:
-  <minutes>     Execution interval in minutes
-  <minutes>m    Execution interval in minutes
-  <hours>h      Execution interval in hours
-  <days>d       Execution interval in days
+admin@USG-Pro-4:~$ /opt/vyatta/sbin/vyatta-cfg-cmd-wrapper show system task-scheduler
 ```
 
+Normally you should get an output like the following:
+
+```
+ task vpn-site-to-site {
+     executable {
+         path /config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh
+     }
+     interval 5m
+ }
+```
 
 Known Issues
 -----------
@@ -211,12 +213,11 @@ If the domain can't be resolved, your USG has a problem with the DNS it uses.
 ### No remote address found. Abort.
 Same issue as [No local address found. Abort.](#no-local-address-found-abort) See above.
 
-
 Compatibility
 -------
 
 Tested and productive in use:
-* Ubiquiti UniFi Security Gateway, USG with FW 4.4.57.5578372
+* Ubiquiti UniFi Security Gateway, USG-3P with FW 4.4.57.5578372
 * Ubiquiti UniFi Security Gateway, USG-PRO-4 with FW 4.4.57.5578372
 
 License
