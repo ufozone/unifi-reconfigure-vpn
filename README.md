@@ -98,7 +98,7 @@ Your `config.gateway.json` needs an addition.
 
 Check this: [UniFi - USG Advanced Configuration Using config.gateway.json](https://help.ui.com/hc/en-us/articles/215458888-UniFi-USG-Advanced-Configuration-Using-config-gateway-json)
 
-#### Set-up only one site-to-site VPN IPsec tunnels
+#### Set-up (only) one site-to-site VPN IPsec tunnel
 
 Merge the contents of the `config.gateway.merge.json` in your `config.gateway.json` for both sites.
 
