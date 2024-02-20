@@ -35,18 +35,24 @@ admin@USG-Pro-4:~$ sudo vi /config/vpn-site-to-site.conf
 
 Input the content of the `vpn-site-to-site.conf`.
 
-Change the variables:
-| Variable          | Description                                                        | Values                       |
-|-------------------|--------------------------------------------------------------------|------------------------------|
-| THIS_SITE         | Letter of current site. Each site must be different from the other | ENUM(A,B)                    |
-| SITE_A_HOST       | Hostname of site A                                                 | FQDN with final point        |
-| SITE_B_HOST       | Hostname of site B                                                 | FQDN with final point        |
-| SITE_A_NETWORKS   | Networks of site A which are to be routed                          | CIDR format space seperated  |
-| SITE_B_NETWORKS   | Networks of site B which are to be routed                          | CIDR format space seperated  |
-| PRE_SHARED_SECRET | Pre shared key                                                     | Secret with 24 or more bytes |
-| VTI_BIND          | Name of Virtual Tunnel Interface                                   | vti[0-255] Default: vti64    |
-| ESP_GROUP         | Name of ESP Group                                                  | ESP[0-255] Default: ESP0     |
-| IKE_GROUP         | Name of IKE Group                                                  | IKE[0-255] Default: IKE0     |
+Change these variables:
+| Variable          | Description                                                        | Values                                  |
+|-------------------|--------------------------------------------------------------------|-----------------------------------------|
+| LOCAL_HOST        | Hostname of this site                                              | FQDN with final point                   |
+| REMOTE_HOST       | Hostname of the remote site                                        | FQDN with final point                   |
+| LOCAL_NETWORKS    | Networks of this site which are to be routed                       | CIDR format space seperated             |
+| REMOTE_NETWORKS   | Networks of the remote site which are to be routed                 | CIDR format space seperated             |
+| PRE_SHARED_SECRET | Pre shared key                                                     | Secret with 24 or more bytes            |
+| TRANSFER_NETWORK        | Transfer network                                             | CIDR format. Default: "10.255.254.0/30" |
+| LOCAL_TRANSFER_ADDRESS  | Address of this site in the transfer network                 | CIDR format. Default: "10.255.254.1/30" |
+| REMOTE_TRANSFER_ADDRESS | Address of the remote site in the transfer network           | CIDR format. Default: "10.255.254.2/30" |
+
+For more than one IPsec Site-2-Site setup, further change these variables:
+| Variable                | Description                                                  | Values                                  |
+|-------------------------|--------------------------------------------------------------|-----------------------------------------|
+| VTI_BIND                | Name of Virtual Tunnel Interface                             | vti[0-255] Default: vti64               |
+| ESP_GROUP               | Name of ESP Group                                            | ESP[0-255] Default: ESP0                |
+| IKE_GROUP               | Name of IKE Group                                            | IKE[0-255] Default: IKE0                |
 
 Make sure to convert both files to LF.
 
@@ -72,6 +78,79 @@ Merge the contents of the `config.gateway.merge.json` in your `config.gateway.js
 
 __You have no idea how to find or create the config.gateway.json?__
 Check this: [UniFi - USG Advanced Configuration Using config.gateway.json](https://help.ui.com/hc/en-us/articles/215458888-UniFi-USG-Advanced-Configuration-Using-config-gateway-json)
+
+
+__Multiple IPsec Tunnels__
+```
+{
+        "system": {
+                "task-scheduler": {
+                        "task": {
+                                "ipsecvpn1": {
+                                        "executable": {
+                                                "path": "/config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh",
+                                                "arguments": "/config/ipsec-vpn1.conf"
+                                        },
+                                        "interval": "5m"
+                                },
+                                "ipsecvpn2": {
+                                        "executable": {
+                                                "path": "/config/scripts/post-config.d/vpn-site-to-site-reconfigure.sh",
+                                                "arguments": "/config/ipsec-vpn2.conf"
+                                        },
+                                        "interval": "5m"
+                                }
+                        }
+                }
+        },
+        "vpn": {
+                "ipsec": {
+                        "auto-firewall-nat-exclude": "enable",
+                        "ipsec-interfaces": {
+                                "interface": [
+                                        "pppoe0"
+                                ]
+                        },
+                        "nat-networks": {
+                                "allowed-network": {
+                                        "0.0.0.0/0": "''"
+                                }
+                        },
+                        "nat-traversal": "enable"
+                }
+        }
+}
+```
+
+To test, configure the tasks via CLI (NOT PERSISTENT):
+```
+set system task-scheduler task
+Possible completions:
+  <text>        Task name
+
+set system task-scheduler task task_name
+Possible completions:
+  crontab-spec  UNIX crontab specification string
+  executable    Executable path and arguments
+  interval      Execution interval
+
+set system task-scheduler task task_name crontab-spec
+Possible completions:
+  <text>        UNIX crontab specification string
+
+set system task-scheduler task task_name executable
+Possible completions:
+  arguments     Arguments passed to the executable
+  path          Path to executable
+
+set system task-scheduler task task_name interval
+Possible completions:
+  <minutes>     Execution interval in minutes
+  <minutes>m    Execution interval in minutes
+  <hours>h      Execution interval in hours
+  <days>d       Execution interval in days
+```
+
 
 Known Issues
 -----------
