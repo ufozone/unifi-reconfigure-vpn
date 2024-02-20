@@ -104,13 +104,13 @@ Help()
     echo "UniFi Site-to-Site IPsec VTI VPN does not detect a change of WAN IP address."
     echo "This script checks periodically the current WAN IP addresses of both sites and updates the configuration."
     echo
-    echo "Syntax: ${0##*/} [-d|h|v|c <file>]"
+    echo "Syntax: ${0##*/} [-d|-v|-c<file>]|-r|-h]"
     echo "Options:"
-    echo "c <file> Config file. Default: /config/vpn-site-to-site.conf"  
-    echo "d        Debug mode. Does not make any changes to the configuration, but displays them."
-    echo "h        Print this Help."
-    echo "r        Reset all configuration changes."
-    echo "v        Verbose mode. It provides additional details."
+    echo " -d       Debug mode. Does not make any changes to the configuration, but displays them."
+    echo " -v       Verbose mode. It provides additional details."
+    echo " -c<file> Config file. Default: /config/vpn-site-to-site.conf"
+    echo " -r       Reset all configuration changes."
+    echo " -h       Print this Help."
     echo
 }
 
@@ -129,31 +129,45 @@ NAME="vpn-site-to-site-reconfigure"
 WR="/opt/vyatta/sbin/vyatta-cfg-cmd-wrapper"
 CONFIG_FILE="/config/vpn-site-to-site.conf"
 
-while getopts ":dhrvc:" option
+while getopts ":dvc:rh" option
 do
    case $option in
-      c) # -c <file> -- Config file
-         CONFIG_FILE=${OPTARG}
-         NAME="${NAME}(${CONFIG_FILE##*/})";;
       d) # -d -- Debug
-         DEBUG=TRUE;;
-      r) # -r -- Reset
-         RESET=TRUE;;
+         DEBUG=TRUE
+         ;;
       v) # -v -- Verbose
-         VERBOSE=TRUE;;
+         VERBOSE=TRUE
+         ;;
+      c) # -c<file> -- Config file
+         CONFIG_FILE=${OPTARG}
+         NAME="${NAME}(${CONFIG_FILE##*/})"
+         ;;
+      r) # -r -- Reset
+         RESET=TRUE
+         ;;
       h) # -h -- Help
          Help
          exit;;
-      \?) # ???
-         echo "Invalid option"
+      :) # Argument required
+         echo "Option -${OPTARG} requires an argument."
+         echo ""
+         Help
+         exit;;
+      ?) # Invalid option
+         echo "Invalid option: -${OPTARG}"
+         echo ""
          Help
          exit;;
    esac
 done
 
-if [[ ! -e $CONFIG_FILE ]]
+if [[ ! -n $CONFIG_FILE ]]
 then
-    Log "File ${$CONFIG_FILE} not found. Abort."
+    Log "No configuration file given. Abort."
+    exit 1
+elif [[ ! -e $CONFIG_FILE ]]
+then
+    Log "Configuration file ${CONFIG_FILE} not found. Abort."
     exit 1
 fi
 
@@ -168,9 +182,9 @@ then
     DESCRIPTION="CUSTOM_BY_SCRIPT"
 fi
 
-if [[ ( $LOCAL_HOST == "" ) || ( $REMOTE_HOST == "" ) || ( $PRE_SHARED_SECRET == "" ) ]]
+if [[ ! -n $LOCAL_HOST || ! -n $REMOTE_HOST || ! -n $PRE_SHARED_SECRET ]]
 then
-    Log "Configuration in vpn-site-to-site.conf is invalid. Abort."
+    Log "Configuration in ${CONFIG_FILE} is invalid. Abort."
     exit 1
 fi
 
@@ -276,7 +290,7 @@ then
     IKE_HASH="sha1"
 fi
 
-
+# Reset
 if [[ $RESET == TRUE ]]
 then
     Reset
