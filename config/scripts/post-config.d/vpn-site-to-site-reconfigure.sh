@@ -1,8 +1,8 @@
 #!/bin/bash
 # File: vpn-site-to-site-reconfigure.sh
 # Author: ufozone
-# Date: 2023-01-29
-# Version: 2.2.1
+# Date: 2024-02-20
+# Version: 3.0.0
 # Desc: UniFi Site-to-Site IPsec VTI VPN does not detect a change of WAN IP address.
 #       This script checks periodically the current WAN IP addresses of both sites and 
 #       updates the configuration.
@@ -177,15 +177,11 @@ fi
 # Transfer Network Details
 if [[ ! -n $TRANSFER_NETWORK ]]
 then
-    TRANSFER_NETWORK="10.255.254.0/30"
+    TRANSFER_NETWORK="10.255.254.0/24"
 fi
-if [[ ! -n $LOCAL_TRANSFER_ADDRESS ]]
+if [[ ! -n $TRANSFER_ADDRESS ]]
 then
-    LOCAL_TRANSFER_ADDRESS="10.255.254.1/30"
-fi
-if [[ ! -n $REMOTE_TRANSFER_ADDRESS ]]
-then
-    REMOTE_TRANSFER_ADDRESS="10.255.254.2/30"
+    TRANSFER_ADDRESS="10.255.254.1/32"
 fi
 
 # Route Distance
@@ -227,8 +223,6 @@ then
 fi
 if [[ ! -n $ESP_MODE ]]
 then
-#  tunnel        Tunnel mode (default)
-#  transport     Transport mode
     ESP_MODE="tunnel"
 fi
 if [[ ! -n $ESP_PFS ]]
@@ -241,7 +235,7 @@ then
 fi
 if [[ ! -n $ESP_HASH ]]
 then
-    ESP_HASH="sha512"
+    ESP_HASH="sha1"
 fi
 
 # IKE Settings
@@ -263,7 +257,7 @@ then
 fi
 if [[ ! -n $IKE_KEYEXCHANGE ]]
 then
-    IKE_KEYEXCHANGE="ikev2"
+    IKE_KEYEXCHANGE="ikev1"
 fi
 if [[ ! -n $IKE_LIFETIME ]]
 then
@@ -271,7 +265,7 @@ then
 fi
 if [[ ! -n $IKE_DHGROUP ]]
 then
-    IKE_DHGROUP=16
+    IKE_DHGROUP=14
 fi
 if [[ ! -n $IKE_ENCRYPTION ]]
 then
@@ -279,7 +273,7 @@ then
 fi
 if [[ ! -n $IKE_HASH ]]
 then
-    IKE_HASH="sha512"
+    IKE_HASH="sha1"
 fi
 
 
