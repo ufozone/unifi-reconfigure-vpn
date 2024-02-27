@@ -71,10 +71,10 @@ After the first run, your output should look like this:
 ```
 Feb 20 10:15:01 USG-Pro-4 vpn-site-to-site-reconfigure: VTI interface vti64 not found in configuration. Create.
 Feb 20 10:15:01 USG-Pro-4 vpn-site-to-site-reconfigure: Static route 10.255.254.0/24 not found. Create.
-Feb 20 10:15:01 USG-Pro-4 vpn-site-to-site-reconfigure: Static route 10.2.1.0/24/24 not found. Create.
-Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: Firewall group item 10.2.1.0/24/24 not found. Create.
-Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: Static route 10.2.2.0/24/24 not found. Create.
-Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: Firewall group item 10.2.2.0/24/24 not found. Create.
+Feb 20 10:15:01 USG-Pro-4 vpn-site-to-site-reconfigure: Static route 10.2.1.0/24 not found. Create.
+Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: Firewall group item 10.2.1.0/24 not found. Create.
+Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: Static route 10.2.2.0/24 not found. Create.
+Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: Firewall group item 10.2.2.0/24 not found. Create.
 Feb 20 10:15:02 USG-Pro-4 vpn-site-to-site-reconfigure: ESP group ESP0 not found in configuration. Create.
 Feb 20 10:15:03 USG-Pro-4 vpn-site-to-site-reconfigure: IKE group IKE0 not found in configuration. Create.
 Feb 20 10:15:03 USG-Pro-4 vpn-site-to-site-reconfigure: No site-to-site peer configuration found.
